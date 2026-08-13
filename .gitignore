@@ -1,0 +1,39 @@
+# ============================================================
+#  Keil MDK-ARM build & debug artifacts
+# ============================================================
+
+# Object / dependency / cross-reference files
+*.o
+*.crf
+*.d
+*.dep
+*.iex
+*.orig
+
+# Linker / executable / listing / map outputs
+*.axf
+*.hex
+*.map
+*.lnp
+*.sct
+*.lst
+*.htm
+*.build_log.htm
+
+# Build log
+build.log
+
+# Keil user-specific window layout (machine-local)
+*.uvguix.*
+
+# Keil output directory (all build artifacts)
+04_Project/MDK-ARM/test/
+
+# ============================================================
+#  General
+# ============================================================
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
