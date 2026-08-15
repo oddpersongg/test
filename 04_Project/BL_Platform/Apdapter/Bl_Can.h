@@ -14,7 +14,9 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-11   [New] module created, AUTOSAR Can driver skeleton
+ * V1.0.0   2026-08-15   [New] module created, AUTOSAR-style CAN driver interface:
+ *                       Write / MainFunctions / GetRxOverflow; driver calls
+ *                       CanIf_RxIndication / CanIf_TxConfirmation (AUTOSAR MCAL)
  */
 
 /****************************************************************
@@ -31,6 +33,7 @@ extern "C" {
  *                        Includes
  ***************************************************************/
 #include "Bl_Types.h"
+#include "Bl_Can_Cfg.h"
 
 /****************************************************************
  *                         Macros
@@ -44,11 +47,25 @@ extern "C" {
 /** @brief CAN payload length (max DLC = 8) */
 #define BL_CAN_PDU_DATA_LENGTH           8
 
-/** @brief CAN HOH (Hardware Object Handle) count */
-#define BL_CAN_MAX_HOH                   32
-
 /** @brief CAN busy status (extended from BL_E_OK / BL_E_NOT_OK) */
 #define BL_CAN_BUSY                      2
+
+/** @brief invalid HOH / software PDU handle */
+#define BL_CAN_INVALID_HOH               0xFFFFU
+
+/**
+ * @brief CAN identifier encoding (AUTOSAR Can_IdType)
+ *        bit31 = IDE (1 = extended), bit30 = RTR (1 = remote), bit28..0 = ID
+ */
+#define BL_CAN_IDE_FLAG                  0x80000000UL
+#define BL_CAN_RTR_FLAG                  0x40000000UL
+#define BL_CAN_ID_MASK                   0x1FFFFFFFUL
+
+/**
+ * @brief HOH (Hardware Object Handle) type
+ */
+#define BL_CAN_HOH_TYPE_TX               0U      /**< TX hardware object   */
+#define BL_CAN_HOH_TYPE_RX               1U      /**< RX hardware object   */
 
 /****************************************************************
  *                       Type Defs
@@ -60,7 +77,7 @@ extern "C" {
 typedef bl_uint16_t Bl_Can_HohType;
 
 /**
- * @brief CAN identifier (standard 11-bit or extended 29-bit)
+ * @brief CAN identifier (standard 11-bit or extended 29-bit, AUTOSAR encoded)
  */
 typedef bl_uint32_t Bl_Can_CanIdType;
 
@@ -80,17 +97,34 @@ typedef struct {
 } Bl_Can_PduType;
 
 /**
+ * @brief CAN HOH (Hardware Object Handle) configuration
+ *
+ * - TX HOH : u8_HwObj / id / mask are unused (mailbox auto selected by HAL)
+ * - RX HOH : u8_HwObj = RX FIFO (0/1), id/mask define the acceptance filter
+ *            (mask = 0 means "accept all")
+ */
+typedef struct {
+    Bl_Can_HohType   hoh;               /**< HOH id, unique                 */
+    bl_uint8_t       u8_Type;           /**< BL_CAN_HOH_TYPE_TX / _RX       */
+    bl_uint8_t       u8_HwObj;          /**< RX: FIFO 0/1                   */
+    Bl_Can_CanIdType id;                /**< RX: filter id (AUTOSAR encoded)*/
+    Bl_Can_CanIdType mask;              /**< RX: filter mask                */
+} Bl_Can_HohConfig_t;
+
+/**
  * @brief CAN module global config (config-tool generated)
  */
 typedef struct {
-    bl_uint32_t placeholder;             /**< config placeholder, to be expanded */
+    bl_uint8_t                u8_HohCount;    /**< HOH config entry count  */
+    const Bl_Can_HohConfig_t *p_HohConfig;    /**< HOH config array        */
 } Bl_Can_ConfigType;
 
 /****************************************************************
  *                 Global Variables
  ***************************************************************/
 
-extern Bl_Can_ConfigType g_Bl_Can_Config;
+/** @brief Can module global config (defined in Bl_Can.c) */
+extern const Bl_Can_ConfigType g_Bl_Can_Config;
 
 /****************************************************************
  *                Function Declarations
@@ -113,38 +147,80 @@ bl_ret_t Bl_Can_Init(void);
 bl_ret_t Bl_Can_DeInit(void);
 
 /**
- * @brief  write (transmit) a CAN L-PDU via specified HOH
+ * @brief  write (enqueue) a CAN L-PDU for transmission
+ * @note   This only enqueues the L-PDU into the software TX queue and returns.
+ *         The real transmission is performed in Bl_Can_MainFunctionWrite().
  * @param  hoh      : TX Hardware Object Handle
  * @param  pPduInfo : pointer to L-PDU to transmit
- * @retval BL_E_OK     : TX request accepted
- * @retval BL_E_NOT_OK : TX request rejected
- * @retval BL_CAN_BUSY : HOH busy
+ * @retval BL_E_OK     : TX request accepted (enqueued)
+ * @retval BL_E_NOT_OK : TX request rejected (invalid HOH or queue full)
+ * @retval BL_CAN_BUSY : HOH already has a pending TX request
  */
 bl_ret_t Bl_Can_Write(Bl_Can_HohType hoh,
                       const Bl_Can_PduType *pPduInfo);
 
 /**
- * @brief  main function for CAN TX / RX processing (cyclic call)
+ * @brief  CAN MainFunction write (cyclic TX processing)
+ * @note   Must be called cyclically (e.g. from the task scheduler).
+ *         - dequeues TX requests and submits them to hardware mailboxes
+ *         - polls TX mailboxes and raises TxConfirmation on completion
  * @param  None
  * @retval None
  */
-void Bl_Can_MainFunction(void);
+void Bl_Can_MainFunctionWrite(void);
 
 /**
- * @brief  TX confirmation (called from TX interrupt)
- * @param  hoh : HOH that completed transmission
+ * @brief  CAN MainFunction read (cyclic RX processing)
+ * @note   Must be called cyclically (e.g. from the task scheduler).
+ *         - drains the software RX queue and raises RxIndication per frame
+ * @param  None
  * @retval None
  */
-void Bl_Can_TxConfirmation(Bl_Can_HohType hoh);
+void Bl_Can_MainFunctionRead(void);
 
 /**
- * @brief  RX indication (called from RX interrupt)
- * @param  hoh      : HOH that received a message
- * @param  pPduInfo : pointer to received L-PDU
+ * @brief  CAN RX interrupt service routine (called from HAL RX callbacks)
+ * @note   Reads the specified RX FIFO and pushes frames into the software RX queue.
+ *         Called in interrupt context.
+ * @param  u8_Fifo : RX FIFO number (0/1)
  * @retval None
  */
-void Bl_Can_RxIndication(Bl_Can_HohType hoh,
-                         const Bl_Can_PduType *pPduInfo);
+void Bl_Can_RxIsr(bl_uint8_t u8_Fifo);
+
+/**
+ * @brief  CAN MainFunction bus-off (bus-off recovery processing)
+ * @note   Cyclic software bus-off recovery: detects ESR.BOF, stops the CAN,
+ *         waits BL_CAN_BUSOFF_RECOVERY_TIME_MS, then restarts it.
+ *         See Bl_Can.c. Disabled by setting BL_CAN_BUSOFF_RECOVERY_ENABLE to 0.
+ * @param  None
+ * @retval None
+ */
+void Bl_Can_MainFunctionBusOff(void);
+
+/**
+ * @brief  CAN MainFunction mode (mode transition processing)
+ * @note   Not implemented yet, reserved for AUTOSAR-style mode handling.
+ * @param  None
+ * @retval None
+ */
+void Bl_Can_MainFunctionMode(void);
+
+/**
+ * @brief  CAN MainFunction wakeup (wakeup processing)
+ * @note   Not implemented yet, reserved for AUTOSAR-style wakeup handling.
+ * @param  None
+ * @retval None
+ */
+void Bl_Can_MainFunctionWakeup(void);
+
+/**
+ * @brief  get RX queue overflow counter (frames dropped by the software RX queue)
+ * @note   Incremented in ISR context when the software RX queue is full.
+ *         Reset by Bl_Can_Init() / Bl_Can_DeInit().
+ * @param  None
+ * @retval number of frames dropped because the RX queue was full
+ */
+bl_uint16_t Bl_Can_GetRxOverflow(void);
 
 #ifdef __cplusplus
 }

@@ -14,9 +14,10 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-12   [New] module created, basic functionality implemented
- *                       [New] Bl_Rte_Init / Bl_Rte_Deinit added
- *                       [Modify] SysInit / ProcessInit became static
+ * V1.0.0   2026-08-15   [New] module created, RTE init/deinit glue: driver
+ *                       adapter (SysInit/Deinit) + scheduler + TimingManager
+ *                       + CanIf + CanTp + Uds (ProcessInit/Deinit) + user
+ *                       tasks, reverse order
  */
 
 /****************************************************************
@@ -26,6 +27,10 @@
 #include "Bl_DriverAdapter.h"
 #include "Bl_TaskSchedule.h"
 #include "Bl_TaskUserdef.h"
+#include "Bl_CanIf.h"
+#include "Bl_CanTp.h"
+#include "Bl_Uds.h"
+#include "Bl_TimingManager.h"
 
 /****************************************************************
  *                         Macros
@@ -134,9 +139,15 @@ static bl_ret_t s_Bl_Rte_SysDeinit(void)
  */
 static bl_ret_t s_Bl_Rte_ProcessInit(void)
 {
-    Bl_TaskSchedule_Init();
+    bl_ret_t e_Ret = BL_E_OK;
 
-    return BL_E_OK;
+    Bl_TaskSchedule_Init();
+    e_Ret |= Bl_TimingManager_Init();
+    e_Ret |= Bl_CanIf_Init();
+    e_Ret |= Bl_CanTp_Init();
+    e_Ret |= Bl_Uds_Init();
+
+    return e_Ret;
 }
 
 /**
@@ -148,6 +159,8 @@ static bl_ret_t s_Bl_Rte_ProcessInit(void)
 static bl_ret_t s_Bl_Rte_ProcessDeinit(void)
 {
     /* TODO: add scheduler deinit when available */
+    (void)Bl_CanIf_Deinit();
+    (void)Bl_CanTp_Deinit();
 
     return BL_E_OK;
 }

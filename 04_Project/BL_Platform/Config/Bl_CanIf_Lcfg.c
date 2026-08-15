@@ -1,10 +1,10 @@
 /**
  ******************************************************************************
- * @file    Bl_Isr.c
+ * @file    Bl_CanIf_Lcfg.c
  * @author  -
  * @version V1.0.0
- * @date    2026-08-12
- * @brief   Bl_Isr module source file
+ * @date    2026-08-15
+ * @brief   Bl_CanIf link-time configuration source file
  ******************************************************************************
  */
 
@@ -14,18 +14,14 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-12   [New] module created, basic functionality implemented
- *                       [New] TIM1 period elapsed callback migrated from Bl_DriverAdapter
- *                       [New] CAN RX FIFO0/FIFO1 message pending callbacks
+ * V1.0.0   2026-08-15   [New] module created, PDU config table;
+ *                       V1.0.0 (2026-08-16): diagnostic PDUs 0x7E0 RX / 0x7E8 TX
  */
 
 /****************************************************************
  *                        Includes
  ***************************************************************/
-#include "Bl_Isr.h"
-#include "main.h"
-#include "Bl_TaskSchedule.h"
-#include "Bl_Can.h"
+#include "Bl_CanIf_Lcfg.h"
 
 /****************************************************************
  *                         Macros
@@ -47,50 +43,22 @@
  *                 Global Variables
  ***************************************************************/
 
+/**
+ * @brief CanIf PDU configuration table (UDS standard physical addressing)
+ * @note  DIAG_RX = 0x7E0 (diagnostic requests from tester, routed to CanTp),
+ *        DIAG_TX = 0x7E8 (responses / flow control to tester).
+ *        HOH 1 is the driver's accept-all RX HOH; HOH 0 is the TX HOH.
+ */
+const Bl_CanIf_PduConfigType g_Bl_CanIf_PduConfig[BL_CANIF_PDU_CNT] =
+{
+    /* PduId                  hoh  CanId    mask    dir       */
+    { BL_CANIF_PDU_ID_DIAG_RX, 1U, 0x7E0U, 0x7FFU, BL_CANIF_DIR_RX },
+    { BL_CANIF_PDU_ID_DIAG_TX, 0U, 0x7E8U, 0x7FFU, BL_CANIF_DIR_TX },
+};
+
 /****************************************************************
  *              Global Function Definitions
  ***************************************************************/
-
-/**
- * @brief  TIM1 period elapsed callback
- * @param  p_HTim : timer handle pointer
- * @retval None
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *p_HTim)
-{
-    /* User Add Begin */
-    if (p_HTim->Instance == TIM1)
-    {
-        Bl_TaskSchedule_TickInc();
-    }
-    /* User Add End */
-}
-
-/**
- * @brief  CAN RX FIFO0 message pending callback
- * @param  p_HCan : CAN handle pointer
- * @retval None
- */
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *p_HCan)
-{
-    /* User Add Begin */
-    (void)p_HCan;
-    Bl_Can_RxIsr(0U);
-    /* User Add End */
-}
-
-/**
- * @brief  CAN RX FIFO1 message pending callback
- * @param  p_HCan : CAN handle pointer
- * @retval None
- */
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *p_HCan)
-{
-    /* User Add Begin */
-    (void)p_HCan;
-    Bl_Can_RxIsr(1U);
-    /* User Add End */
-}
 
 /****************************************************************
  *              Static Function Definitions

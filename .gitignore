@@ -22,6 +22,7 @@
 
 # Build log
 build.log
+flash.log
 
 # Keil user-specific window layout (machine-local)
 *.uvguix.*

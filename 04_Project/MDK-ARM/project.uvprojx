@@ -476,6 +476,11 @@
               <FilePath>../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c</FilePath>
             </File>
             <File>
+              <FileName>stm32f1xx_hal_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_can.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32f1xx_hal_rcc.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c</FilePath>
@@ -576,6 +581,11 @@
               <FilePath>../BL_Platform/Apdapter/Bl_Can.h</FilePath>
             </File>
             <File>
+              <FileName>Bl_Can_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Apdapter/Bl_Can_Cfg.h</FilePath>
+            </File>
+            <File>
               <FileName>Bl_TaskUserdef.c</FileName>
               <FileType>1</FileType>
               <FilePath>../BL_Platform/Apdapter/Bl_TaskUserdef.c</FilePath>
@@ -620,6 +630,56 @@
               <FileType>5</FileType>
               <FilePath>../BL_Platform/Core/Bl_Rte.h</FilePath>
             </File>
+            <File>
+              <FileName>Bl_Dcm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_Dcm.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Dcm.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_Dcm.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanIf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_CanIf.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanIf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_CanIf.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanTp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_CanTp.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanTp.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_CanTp.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Uds.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_Uds.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Uds.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_Uds.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_TimingManager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_TimingManager.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_TimingManager.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_TimingManager.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -639,6 +699,51 @@
               <FileName>Bl_TaskSchedule_Cfg.h</FileName>
               <FileType>5</FileType>
               <FilePath>../BL_Platform/Config/Bl_TaskSchedule_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Dcm_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_Dcm_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Dcm_Lcfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_Dcm_Lcfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Dcm_Lcfg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Config/Bl_Dcm_Lcfg.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanIf_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_CanIf_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanIf_Lcfg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Config/Bl_CanIf_Lcfg.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanIf_Lcfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_CanIf_Lcfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_CanTp_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_CanTp_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Uds_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_Uds_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_TimingManager_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_TimingManager_Cfg.h</FilePath>
             </File>
           </Files>
         </Group>

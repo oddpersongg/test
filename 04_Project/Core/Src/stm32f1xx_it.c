@@ -57,7 +57,7 @@
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim1;
 /* USER CODE BEGIN EV */
-
+extern CAN_HandleTypeDef hcan;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -213,5 +213,19 @@ void TIM1_UP_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+/**
+  * @brief This function handles CAN1 RX FIFO0 interrupt.
+  */
+void CAN1_RX0_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&hcan);
+}
 
+/**
+  * @brief This function handles CAN1 RX FIFO1 interrupt.
+  */
+void CAN1_RX1_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&hcan);
+}
 /* USER CODE END 1 */

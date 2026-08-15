@@ -18,6 +18,7 @@
  *                       [New] RegisterTaskInfinite added for infinite-period tasks
  *                       [Modify] Init takes no param, reads from Lcfg const struct
  *                       [Modify] BL_TASKSCHEDULE_MAX_TASKS moved to Cfg.h
+ *                       [New] Bl_TaskSchedule_GetTickMs added (system tick read)
  */
 
 /****************************************************************
@@ -117,6 +118,15 @@ bl_uint8_t Bl_TaskSchedule_RegisterTaskInfinite(Bl_TaskSchedule_TaskFunc_t p_Fun
  * @retval BL_E_NOT_OK : failure (invalid ID or not in use)
  */
 bl_ret_t Bl_TaskSchedule_UnregisterTask(bl_uint8_t u8_TaskId);
+
+/**
+ * @brief  get the system tick in ms (wrap-safe for unsigned subtraction)
+ * @note   Platform time base for chip-agnostic Core modules (e.g. CanTp
+ *         timeouts). Driven by Bl_TaskSchedule_TickInc (1ms).
+ * @param  None
+ * @retval current tick count in ms
+ */
+bl_uint32_t Bl_TaskSchedule_GetTickMs(void);
 
 /**
  * @brief  tick increment, call from SysTick ISR or timer ISR

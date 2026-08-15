@@ -14,10 +14,11 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-12   [New] module created, basic functionality implemented
- *                       [New] RegisterTaskInfinite added for infinite-period tasks
- *                       [Modify] Init reads config from Lcfg const struct
- *                       [Modify] MainFunction delegate to s_Bl_TaskSchedule_Process
+ * V1.0.0   2026-08-15   [New] module created, cooperative task scheduler:
+ *                       Lcfg-driven init, RegisterTask / RegisterTaskInfinite,
+ *                       tick-driven dispatch (wrap-safe), GetTickMs, main loop
+ *                       drives Bl_Can MainFunction Write/Read/BusOff +
+ *                       Bl_CanTp_MainFunction
  */
 
 /****************************************************************
@@ -25,6 +26,11 @@
  ***************************************************************/
 #include "Bl_TaskSchedule.h"
 #include "Bl_TaskSchedule_Lcfg.h"
+/* Core depends on Apdapter's stable interface (Bl_Can.h); only the adapter
+   implementation (Bl_Can.c) is chip-specific and re-adapted when porting. */
+#include "Bl_Can.h"
+/* CanTp (Core) cyclic: timeouts + STmin pacing */
+#include "Bl_CanTp.h"
 
 /****************************************************************
  *                         Macros
@@ -53,7 +59,7 @@ static Bl_TaskSchedule_PrivTask_t s_Bl_TaskSchedule_TaskTable[BL_TASKSCHEDULE_MA
 static bl_uint8_t                 s_Bl_TaskSchedule_MaxTasks = 0U;                         /**< active task count      */
 static bl_uint16_t                s_Bl_TaskSchedule_TickPeriodMs = 1U;                     /**< tick period in ms      */
 static volatile bl_uint32_t       s_Bl_TaskSchedule_TickMs = 0U;                           /**< system tick counter    */
-static bl_uint8_t                 s_Bl_TaskSchedule_Ready = 0U;                            /**< init complete flag     */
+static bl_uint8_t                 s_Bl_TaskSchedule_Ready = BL_E_NOT_OK;                    /**< init complete flag     */
 
 /****************************************************************
  *             Static Function Declarations
@@ -103,7 +109,7 @@ void Bl_TaskSchedule_Init(void)
         s_Bl_TaskSchedule_TaskTable[i].u8_IsUsed      = 0U;
     }
 
-    s_Bl_TaskSchedule_Ready = 1U;
+    s_Bl_TaskSchedule_Ready = BL_E_OK;
 }
 
 /**
@@ -116,7 +122,7 @@ bl_uint8_t Bl_TaskSchedule_RegisterTask(const Bl_TaskSchedule_TaskAttr_t *p_Task
 {
     bl_uint8_t i;
 
-    if ((s_Bl_TaskSchedule_Ready == 0U) ||
+    if ((s_Bl_TaskSchedule_Ready != BL_E_OK) ||
         (p_TaskAttr == BL_NULL_PTR) ||
         (p_TaskAttr->p_Func == BL_NULL_PTR))
     {
@@ -172,7 +178,7 @@ bl_uint8_t Bl_TaskSchedule_RegisterTaskInfinite(Bl_TaskSchedule_TaskFunc_t p_Fun
  */
 bl_ret_t Bl_TaskSchedule_UnregisterTask(bl_uint8_t u8_TaskId)
 {
-    if ((s_Bl_TaskSchedule_Ready == 0U) ||
+    if ((s_Bl_TaskSchedule_Ready != BL_E_OK) ||
         (u8_TaskId >= s_Bl_TaskSchedule_MaxTasks))
     {
         return BL_E_NOT_OK;
@@ -190,13 +196,23 @@ bl_ret_t Bl_TaskSchedule_UnregisterTask(bl_uint8_t u8_TaskId)
 }
 
 /**
+ * @brief  get the system tick in ms
+ * @param  None
+ * @retval current tick count in ms
+ */
+bl_uint32_t Bl_TaskSchedule_GetTickMs(void)
+{
+    return s_Bl_TaskSchedule_TickMs;
+}
+
+/**
  * @brief  tick increment, call from SysTick or timer ISR
  * @param  None
  * @retval None
  */
 void Bl_TaskSchedule_TickInc(void)
 {
-    if (s_Bl_TaskSchedule_Ready != 0U)
+    if (s_Bl_TaskSchedule_Ready == BL_E_OK)
     {
         s_Bl_TaskSchedule_TickMs += s_Bl_TaskSchedule_TickPeriodMs;
     }
@@ -212,6 +228,14 @@ void Bl_TaskSchedule_MainFunction(void)
     while (1)
     {
         s_Bl_TaskSchedule_Process();
+
+        /* Call Apdapter stable interface; only its implementation is chip-specific. */
+        Bl_Can_MainFunctionWrite();
+        Bl_Can_MainFunctionRead();
+        Bl_Can_MainFunctionBusOff();
+
+        /* CanTp cyclic processing (timeouts, STmin pacing) */
+        Bl_CanTp_MainFunction();
     }
 }
 
@@ -230,7 +254,7 @@ static void s_Bl_TaskSchedule_Process(void)
     bl_uint32_t u32_CurrentTickMs;
     bl_uint32_t u32_ElapsedMs;
 
-    if (s_Bl_TaskSchedule_Ready == 0U)
+    if (s_Bl_TaskSchedule_Ready != BL_E_OK)
     {
         return;
     }

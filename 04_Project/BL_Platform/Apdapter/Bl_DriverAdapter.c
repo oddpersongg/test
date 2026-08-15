@@ -20,12 +20,14 @@
  *                       [New] TIM1 update interrupt init
  *                       [New] Deinit added for module de-initialization
  *                       [Modify] TIM1 callback migrated to Bl_Isr
+ *                       [New] Can init/deinit added for Bl_Can module
  */
 
 /****************************************************************
  *                        Includes
  ***************************************************************/
 #include "Bl_DriverAdapter.h"
+#include "Bl_Can.h"
 #include "main.h"
 
 /****************************************************************
@@ -76,6 +78,22 @@ static bl_ret_t s_Bl_DriverAdapter_CddDeinit(void);
  */
 static bl_ret_t s_Bl_DriverAdapter_TimerDeinit(void);
 
+/**
+ * @brief  init CAN driver
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_CanInit(void);
+
+/**
+ * @brief  deinit CAN driver
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_CanDeinit(void);
+
 /****************************************************************
  *                 Global Variables
  ***************************************************************/
@@ -96,6 +114,7 @@ bl_ret_t Bl_DriverAdapter_Init(void)
 
     e_Ret  = s_Bl_DriverAdapter_CddInit();
     e_Ret |= s_Bl_DriverAdapter_TimerInit();
+    e_Ret |= s_Bl_DriverAdapter_CanInit();
 
     return e_Ret;
 }
@@ -112,6 +131,7 @@ bl_ret_t Bl_DriverAdapter_Deinit(void)
 
     e_Ret  = s_Bl_DriverAdapter_CddDeinit();
     e_Ret |= s_Bl_DriverAdapter_TimerDeinit();
+    e_Ret |= s_Bl_DriverAdapter_CanDeinit();
 
     return e_Ret;
 }
@@ -178,6 +198,32 @@ static bl_ret_t s_Bl_DriverAdapter_TimerDeinit(void)
     /* User Add End */
 
     return BL_E_OK;
+}
+
+/**
+ * @brief  init CAN driver
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_CanInit(void)
+{
+    /* User Add Begin */
+    return Bl_Can_Init();
+    /* User Add End */
+}
+
+/**
+ * @brief  deinit CAN driver
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_CanDeinit(void)
+{
+    /* User Add Begin */
+    return Bl_Can_DeInit();
+    /* User Add End */
 }
 
 /******************************* EOF (End of File) ***************************/
