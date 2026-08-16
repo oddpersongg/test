@@ -27,7 +27,7 @@ Hardware loopback testing of the diagnostic stack (Bl_Can → CanIf → CanTp �
 - **⚠️ ISO-TP framing is mandatory**: CanTp parses `data[0]` as PCI. A **raw** UDS request `0x7E0 [10 01]` is decoded as an FF frame (`0x1xxx`) and dropped — it MUST be framed: `0x7E0 [02 10 01]` (SF len=2 + 10 01). Response comes back framed too: `0x7E8 [06 50 01 00 32 13 88]`.
 - **Known driver quirk**: after many open/close or Keil-flash cycles the USBCAN can get stuck (VCI_Transmit blocks ~1.7–5 s and returns 0, ErrCode=0x2). Software recovery (ResetCAN/InitCAN/ReadBoardInfo cycles) does NOT fix it — **physically replug the USB device**. A listen-only test (no transmit) confirms the driver is alive: it reports ErrCode=0 and no frames.
 - **Flash firmware** (uses the debug probe configured in the project): `UV4.exe -f project.uvprojx -j0 -o flash.log` from `04_Project/MDK-ARM/` (Erase/Programming/Verify).
-- After flashing, wait for the board to boot (OLED shows the 1 s uptime counter) before testing; a board that is not running (no ACK) makes every VCI_Transmit fail with TX error.
+- **⚠️ Reset-and-Run must be enabled**: Keil's Flash Download "Reset and Run" checkbox lives in the GUI (Options → Debug → Settings → Flash Download), not in `uvprojx`/`uvoptx` XML. Without it the board does NOT run the new firmware after flashing — every CAN transmit then fails with no ACK (looks like a dead adapter, but is actually a not-running board). Verify the flash log ends with "Application running ..." and the board boots (OLED shows the 1 s uptime counter) before testing.
 
 ## CubeMX Regeneration
 
@@ -37,8 +37,8 @@ Hardware loopback testing of the diagnostic stack (Bl_Can → CanIf → CanTp �
 - **Business code NOT in `.uvprojx`** — CubeMX regenerates `MDK-ARM/test.uvprojx` without BL_Platform/CDD groups. Sync from `project.uvprojx` or re-add the groups:
   - `BL_Platform/Common` — `../BL_Platform/Common/Bl_Types.h`
   - `BL_Platform/Apdapter` — `Bl_DriverAdapter.c/.h`, `Bl_Can.c/.h`, `Bl_Can_Cfg.h`, `Bl_Isr.c/.h`, `Bl_TaskUserdef.c/.h`
-  - `BL_Platform/Core` — `Bl_TaskSchedule.c/.h`, `Bl_Rte.c/.h`, `Bl_TimingManager.c/.h`, `Bl_Dcm.c/.h`, `Bl_Uds.c/.h`, `Bl_CanIf.c/.h`, `Bl_CanTp.c/.h`
-  - `BL_Platform/Config` — `Bl_TaskSchedule_Cfg.h`, `Bl_TaskSchedule_Lcfg.c/.h`, `Bl_TimingManager_Cfg.h`, `Bl_Dcm_Cfg.h`, `Bl_Dcm_Lcfg.c/.h`, `Bl_Uds_Cfg.h`, `Bl_CanIf_Cfg.h`, `Bl_CanIf_Lcfg.c/.h`, `Bl_CanTp_Cfg.h`
+  - `BL_Platform/Core` — `Bl_TaskSchedule.c/.h`, `Bl_Rte.c/.h`, `Bl_TimingManager.c/.h`, `Bl_Dcm.c/.h`, `Bl_Uds.c/.h`, `Bl_UdsService.c/.h`, `Bl_CanIf.c/.h`, `Bl_CanTp.c/.h`
+  - `BL_Platform/Config` — `Bl_TaskSchedule_Cfg.h`, `Bl_TaskSchedule_Lcfg.c/.h`, `Bl_TimingManager_Cfg.h`, `Bl_Dcm_Cfg.h`, `Bl_Dcm_Lcfg.c/.h`, `Bl_Uds_Cfg.h`, `Bl_UdsService_Lcfg.c/.h`, `Bl_CanIf_Cfg.h`, `Bl_CanIf_Lcfg.c/.h`, `Bl_CanTp_Cfg.h`
   - `CDD/OLED` — `../CDD/OLED/OLED.c/.h`, `../CDD/OLED/OLED_Font.h`
 - **Include paths to add**: `../BL_Platform/Common;../BL_Platform/Apdapter;../BL_Platform/Core;../BL_Platform/Config;../CDD/OLED`
 
@@ -90,14 +90,16 @@ TIM1 (PSC=7, ARR=999, 8MHz HSI) fires at 1kHz → `HAL_TIM_PeriodElapsedCallback
 │   │   ├── Bl_CanIf          CAN Interface layer (PDU dispatch, hardware-independent)
 │   │   ├── Bl_CanTp          ISO 15765-2 transport layer (SF/FF/CF/FC, timeouts)
 │   │   ├── Bl_Dcm            Dcm layer (ISO 14229; service discriminator: SID/NRC/session/security check, then dispatch to Bl_Uds)
-│   │   └── Bl_Uds            UDS service implementations (0x10/0x11/0x27/0x34/0x36/0x37/0x3E + NRC replies)
+│   │   ├── Bl_Uds            UDS service implementations (0x10/0x11/0x27/0x34/0x36/0x37/0x3E + NRC replies)
+│   │   └── Bl_UdsService     Centralized UDS sub-service lookup & dispatch (over Bl_UdsService_Lcfg)
 │   └── Config/              Pure configuration data (no logic)
 │       ├── Bl_TaskSchedule_Cfg.h     Pre-compile config (macros, MAX_TASKS)
 │       ├── Bl_TaskSchedule_Lcfg.h/.c  Link-time const config (g_..._Config)
 │       ├── Bl_TimingManager_Cfg.h    Centralized protocol timeouts (S3/P2/P2*/N_*), single source
 │       ├── Bl_Dcm_Cfg.h              Dcm config (download buffer size = block + 2 overhead, includes Bl_Uds_Cfg.h)
 │       ├── Bl_Dcm_Lcfg.h/.c          Dcm link-time config: diagnostic service table (SID -> handler + dispatch metadata)
-│       └── Bl_Uds_Cfg.h              Uds config (SID/NRC/session/security/P2/P2*, block size, app flash range)
+│       ├── Bl_Uds_Cfg.h              Uds config (SID/NRC/session/security/P2/P2*, block size, app flash range)
+│       └── Bl_UdsService_Lcfg.h/.c   Centralized UDS sub-service table ((SID,subFunc) -> response function)
 ├── CDD/OLED/                Complex Device Driver — SSD1306 0.96" OLED via I2C1
 ├── test.ioc                 CubeMX project config (I2C1 on PB6/PB7, TIM1 update interrupt)
 └── .mxproject               CubeMX metadata (paths relative to MDK-ARM/)
@@ -165,7 +167,7 @@ AUTOSAR CanIf-style layer sitting between the application and the `Bl_Can` drive
 - **TX confirmation (driver → CanIf)**: driver calls `CanIf_TxConfirmation(hoh)` — CanIf maps HOH back to PDU id → `Bl_CanTp_TxConfirmation(pduId)`.
 - **Upper-layer handoff**: no weak hooks — CanIf calls CanTp entry points directly (PduR-style), keeping application-specific handling out of CanIf.
 - **Init/deinit**: called from `Bl_Rte` (`s_Bl_Rte_ProcessInit/ProcessDeinit`), after the driver is up.
-- Default config: PDU 0 = DIAG_RX (0x7E0, requests → CanTp), PDU 1 = DIAG_TX (0x7E8, responses/FC). Unmatched IDs are dropped.
+- Default config: PDU 0 = DIAG_RX (0x7E0, physical requests → CanTp), PDU 1 = DIAG_TX (0x7E8, responses/FC), PDU 2 = DIAG_FUNC_RX (0x7DF, functional requests — broadcast services only). Unmatched IDs are dropped.
 
 ### Bl_CanTp — ISO 15765-2 Transport Layer (Core, Phase 1)
 
@@ -181,8 +183,8 @@ AUTOSAR CanIf-style layer sitting between the application and the `Bl_Can` drive
 AUTOSAR Dcm-style **service discriminator** — decides what a request *is*, then hands it to `Bl_Uds` to *do* it (user decision: Dcm = discrimination only, Uds = service implementations).
 
 - **Files**: `Core/Bl_Dcm.c/.h` (dispatcher), `Config/Bl_Dcm_Cfg.h` (buffer/config), `Config/Bl_Dcm_Lcfg.h/.c` (service table).
-- **Entry**: overrides weak `Bl_CanTp_UpperRxIndication(pduId, sdu, len)` — parses SID, looks it up in the const service table `g_Bl_Dcm_ServiceConfig[]`, runs gating checks, then calls the `Bl_Uds` handler.
-- **Service table struct** (`Bl_Dcm_Service_t` + `Bl_Uds_ServiceFunc_t`, defined in `Config/Bl_Dcm_Lcfg.h`, instantiated in `Bl_Dcm_Lcfg.c`): SID / sub-function byte count (`u8_SubFuncLen`, per-service sub-function config reserve) / sub-function supported bitmap (`u8_SubFuncSupported`, bit N = sub 0xN, 0xFF = any; covers sub 0x00..0x07) / suppress-positive-response flag (`u8_SuppressBit`) / min length / session mask / security needed / P2 & P2* overrides (0xFF = default from `Bl_TimingManager`, reserved for slow-service handling) / response data length (`u8_RespDataLen`, excluding SID+sub; fixed for constant-length responses, upper bound for variable ones) / handler fn. **Add/remove/re-configure services by editing `Bl_Dcm_Lcfg.c` only — no Core changes needed.**
+- **Entry**: overrides weak `Bl_CanTp_UpperRxIndication(pduId, sdu, len)` — parses SID, looks it up in the const service table `g_Bl_Dcm_ServiceConfig[]`, runs gating checks, then calls the `Bl_Uds` handler. **Functional addressing (0x7DF)**: requests on the functional PDU id are accepted only for TesterPresent 0x3E (refreshes S3, sends NO response); all other services on 0x7DF are silently ignored (ISO 14229: no response on functional addressing).
+- **Service table struct** (`Bl_Dcm_Service_t` + `Bl_Uds_ServiceFunc_t`, defined in `Config/Bl_Dcm_Lcfg.h`, instantiated in `Bl_Dcm_Lcfg.c`): SID / sub-function byte count (`u8_SubFuncLen`, 0 = no sub-function, 1 = 1-byte sub-function — ISO 14229 sub-functions are always 1 byte) / sub-function supported bitmap (`u8_SubFuncSupported`, bit N = sub 0xN, 0xFF = any; covers sub 0x00..0x07) / suppress-positive-response flag (`u8_SuppressBit`) / min length / session mask / security needed / P2 & P2* overrides (0xFF = default from `Bl_TimingManager`, reserved for slow-service handling) / response data length (`u8_RespDataLen`, excluding SID+sub; fixed for constant-length responses, upper bound for variable ones) / handler fn. **Add/remove/re-configure services by editing `Bl_Dcm_Lcfg.c` only — no Core changes needed.**
 - **NRC gating order**: SID not found → 0x11 serviceNotSupported; request shorter than min → 0x13 incorrectMessageLength; sub-function length/support/suppress-bit violations → 0x12 subFunctionNotSupported (bitmap covers sub 0x00..0x07, anything above or a 0x80 suppress bit on a service without `u8_SuppressBit` is rejected); session not allowed → 0x7F serviceNotSupportedInActiveSession; security needed and not unlocked → 0x33 securityAccessDenied. Pass → call the `Bl_Uds` handler.
 - **Service table** (7 entries, all → `Bl_Uds_*`): 0x10 (sub 01/02/03, suppress not allowed), 0x11 (sub 01), 0x27 (sub 01/02), 0x3E (sub 00, suppress allowed) in any session (mask 0x07); 0x34/0x36/0x37 (no sub-function) only in programming session (mask 0x02) and require security unlocked.
 - **Download buffer**: `BL_DCM_BUFFER_SIZE[BL_DCM_BUFFER_LEN]` — `BL_DCM_BUFFER_LEN = BL_UDS_TRANSFER_BLOCK_SIZE (2048) + BL_DCM_TRANSFER_OVERHEAD (2)` = 2050. Reused as the CanTp reassembly buffer (single RX session, zero-copy).
@@ -193,7 +195,7 @@ AUTOSAR Dcm-style **service discriminator** — decides what a request *is*, the
 AUTOSAR UDS service layer — the *handlers* behind the Dcm discriminator. `Bl_Uds_ServiceFunc_t = void(*)(const bl_uint8_t*, bl_uint32_t)`.
 
 - **Files**: `Core/Bl_Uds.c/.h` (services), `Config/Bl_Uds_Cfg.h` (SID/NRC/session/security/P2/P2*, `BL_UDS_TRANSFER_BLOCK_SIZE 2048`, `BL_UDS_RESPONSE_BUFFER_LEN 64`, `BL_UDS_APP_FLASH_BASE_ADDR/MAX_SIZE`, download-state macros).
-- **Implemented services**: 0x10 DiagnosticSessionControl (0x50 + sub + P2 + P2*), 0x11 ECUReset (sub 0x01 only), 0x27 SecurityAccess (fixed seed 0x5A / key 0xA5), 0x34 RequestDownload (parse address+length format, validate against app flash range, reply 0x74 with maxBlockLength=0x0800, arm download state), 0x36 TransferData (block-sequence + length checks, dest-address range guard, data write to flash is TODO), 0x37 RequestTransferExit, 0x3E TesterPresent (suppress-bit aware).
+- **Implemented services**: 0x10 DiagnosticSessionControl — **sub-service dispatcher**: `Bl_Uds_DiagSessionControl` matches the sub-function against the **centralized UDS sub-service table** (`Config/Bl_UdsService_Lcfg.h/.c` via `Core/Bl_UdsService.c`: `Bl_UdsService_Find(sid,sub)` / `Bl_UdsService_Dispatch`, entry: sid/subFunc/name/resetSecurity/resetDownload/respDataLen/p_Func) and jumps to the per-sub-service response function (`Bl_Uds_DiagSessionDefaultResp/ProgrammingResp/ExtendedResp`, shared `s_Bl_Uds_SendDiagSessionResp` builds 0x50+sub+P2+P2*); 0x11 ECUReset (sub 0x01 only), 0x27 SecurityAccess (fixed seed 0x5A / key 0xA5), 0x34 RequestDownload (parse address+length format, validate against app flash range, reply 0x74 with maxBlockLength=0x0800, arm download state), 0x36 TransferData (block-sequence + length checks, dest-address range guard, data write to flash is TODO), 0x37 RequestTransferExit, 0x3E TesterPresent (suppress-bit aware).
 - **NRC replies**: `Bl_Uds_SendNrc(sid, nrc)` builds `0x7F SID NRC`; static response buffer `s_Bl_Uds_Resp[64]`.
 - **Response TX queue** (back-to-back requests): CanTp TX is single-session (`Bl_CanTp_Transmit` returns `BL_E_NOT_OK` while a previous response is still in flight), so Uds queues responses in a ring (`BL_UDS_RESPONSE_QUEUE_DEPTH 4`, entries hold a copy of the response). `s_Bl_Uds_SendResponse` pushes + `Bl_Uds_ProcessResponseQueue()`; the override `Bl_CanTp_UpperTxConfirmation` pops the in-flight head (`s_Bl_Uds_TxInFlight`) and re-processes the queue. The queue is ALSO driven periodically by **`Bl_Dcm_MainFunction()`** (called every main-loop iteration after CanTp) — AUTOSAR Dcm_MainFunction style bounded retry, which self-heals the "CanTp busy without a pending confirmation" window. Preserves order for back-to-back requests (e.g. `10 01`+`10 02`+`27 01` → `50 01 → 50 02 → 67 01 5A`). Without this, the middle response was silently dropped (old `(void)Bl_CanTp_Transmit(...)`), appearing last after the tester's timeout retry. Depth 4 suffices for SF responses; raise it if multi-frame (0x62 etc.) responses are added.
 - **Hooks**: overrides weak `Bl_CanTp_UpperTxConfirmation` (pop in-flight + reprocess queue) and `Bl_CanTp_UpperRxErrorIndication` (RX session aborted → reset download state to IDLE, block counter cleared).
@@ -275,8 +277,8 @@ From `01_InputFiles/AI编码规则/文件格式规范.md`:
 ### Current BL_Platform file map
 
 - Common: `Bl_Types.h`
-- Core: `Bl_TaskSchedule.c/.h`, `Bl_Rte.c/.h`, `Bl_TimingManager.c/.h`, `Bl_Dcm.c/.h`, `Bl_Uds.c/.h`, `Bl_CanIf.c/.h`, `Bl_CanTp.c/.h`
-- Config: `Bl_TaskSchedule_Cfg.h`, `Bl_TaskSchedule_Lcfg.c/.h`, `Bl_TimingManager_Cfg.h`, `Bl_Dcm_Cfg.h`, `Bl_Dcm_Lcfg.c/.h`, `Bl_Uds_Cfg.h`, `Bl_CanIf_Cfg.h`, `Bl_CanIf_Lcfg.c/.h`, `Bl_CanTp_Cfg.h`
+- Core: `Bl_TaskSchedule.c/.h`, `Bl_Rte.c/.h`, `Bl_TimingManager.c/.h`, `Bl_Dcm.c/.h`, `Bl_Uds.c/.h`, `Bl_UdsService.c/.h`, `Bl_CanIf.c/.h`, `Bl_CanTp.c/.h`
+- Config: `Bl_TaskSchedule_Cfg.h`, `Bl_TaskSchedule_Lcfg.c/.h`, `Bl_TimingManager_Cfg.h`, `Bl_Dcm_Cfg.h`, `Bl_Dcm_Lcfg.c/.h`, `Bl_Uds_Cfg.h`, `Bl_UdsService_Lcfg.c/.h`, `Bl_CanIf_Cfg.h`, `Bl_CanIf_Lcfg.c/.h`, `Bl_CanTp_Cfg.h`
 - Apdapter: `Bl_DriverAdapter.c/.h`, `Bl_Isr.c/.h`, `Bl_TaskUserdef.c/.h`, `Bl_Can.c/.h`, `Bl_Can_Cfg.h`
 
 ### Key facts / gotchas

@@ -19,6 +19,9 @@
  *                       single TX session, flow control (BS/STmin), N_As /
  *                       N_Bs / N_Cr timeouts, reassembly into the DCM
  *                       download buffer (BL_DCM_BUFFER_SIZE)
+ *                       [Modify] functional RX PDU id (0x7DF) accepted; RX
+ *                       session records its source PDU id so multi-frame
+ *                       delivery/abort reports the correct channel
  */
 
 /****************************************************************
@@ -94,6 +97,7 @@ typedef struct {
     bl_uint8_t       u8_Sn;           /**< expected next CF SN (0..15)        */
     bl_uint8_t       u8_CfInBlock;    /**< CFs received in current block      */
     bl_uint8_t       u8_Bs;           /**< BS used in our FC                  */
+    bl_uint16_t      u16_PduId;       /**< CanIf PDU id of the session        */
     bl_uint32_t      u32_TimerStart;  /**< N_Cr timer start tick              */
 } Bl_CanTp_RxSession_t;
 
@@ -123,7 +127,7 @@ static void     s_Bl_CanTp_TxOnFc(bl_uint8_t u8_Fs, bl_uint8_t u8_Bs, bl_uint8_t
 static void     s_Bl_CanTp_TxAbort(bl_uint8_t u8_Result);
 static void     s_Bl_CanTp_TxMainFunction(void);
 static bl_uint8_t s_Bl_CanTp_FcStminToMs(bl_uint8_t u8_Stmin);
-static void     s_Bl_CanTp_RxStartFf(const Bl_Can_PduType *p_Pdu);
+static void     s_Bl_CanTp_RxStartFf(Bl_CanIf_PduIdType u16_PduId, const Bl_Can_PduType *p_Pdu);
 static void     s_Bl_CanTp_RxHandleCf(const Bl_Can_PduType *p_Pdu);
 static void     s_Bl_CanTp_RxAbort(bl_uint8_t u8_Result);
 static void     s_Bl_CanTp_RxMainFunction(void);
@@ -264,7 +268,8 @@ void Bl_CanTp_RxIndication(Bl_CanIf_PduIdType u16_PduId,
         return;
     }
 
-    if (u16_PduId != BL_CANTP_CANIF_RX_PDU_ID)
+    if ((u16_PduId != BL_CANTP_CANIF_RX_PDU_ID) &&
+        (u16_PduId != BL_CANTP_CANIF_FUNC_RX_PDU_ID))
     {
         return;
     }
@@ -291,7 +296,7 @@ void Bl_CanTp_RxIndication(Bl_CanIf_PduIdType u16_PduId,
         break;
 
     case BL_CANTP_PCI_TYPE_FF:
-        s_Bl_CanTp_RxStartFf(p_Pdu);
+        s_Bl_CanTp_RxStartFf(u16_PduId, p_Pdu);
         break;
 
     case BL_CANTP_PCI_TYPE_CF:
@@ -632,7 +637,7 @@ static bl_uint8_t s_Bl_CanTp_FcStminToMs(bl_uint8_t u8_Stmin)
  * @param  p_Pdu : received FF frame
  * @retval None
  */
-static void s_Bl_CanTp_RxStartFf(const Bl_Can_PduType *p_Pdu)
+static void s_Bl_CanTp_RxStartFf(Bl_CanIf_PduIdType u16_PduId, const Bl_Can_PduType *p_Pdu)
 {
     bl_uint32_t u32_Len = ((bl_uint32_t)(p_Pdu->data[0] & 0x0FU) << 8U) |
                           (bl_uint32_t)p_Pdu->data[1];
@@ -657,6 +662,7 @@ static void s_Bl_CanTp_RxStartFf(const Bl_Can_PduType *p_Pdu)
     s_Bl_CanTp_Rx.u8_Sn        = 1U;
     s_Bl_CanTp_Rx.u8_CfInBlock = 0U;
     s_Bl_CanTp_Rx.u8_Bs        = BL_CANTP_DEFAULT_BS;
+    s_Bl_CanTp_Rx.u16_PduId    = u16_PduId;
 
     for (i = 0U; i < BL_CANTP_FF_DATA_LEN; i++)
     {
@@ -710,7 +716,7 @@ static void s_Bl_CanTp_RxHandleCf(const Bl_Can_PduType *p_Pdu)
     if (s_Bl_CanTp_Rx.u32_RxLen >= s_Bl_CanTp_Rx.u32_SduLen)
     {
         /* complete: deliver the whole SDU */
-        Bl_CanIf_PduIdType u16_PduId = BL_CANTP_CANIF_RX_PDU_ID;
+        Bl_CanIf_PduIdType u16_PduId = s_Bl_CanTp_Rx.u16_PduId;
         bl_uint8_t        *p_Buf     = s_Bl_CanTp_Rx.p_Buf;
         bl_uint32_t        u32_Len   = s_Bl_CanTp_Rx.u32_SduLen;
 
@@ -738,7 +744,7 @@ static void s_Bl_CanTp_RxHandleCf(const Bl_Can_PduType *p_Pdu)
  */
 static void s_Bl_CanTp_RxAbort(bl_uint8_t u8_Result)
 {
-    Bl_CanIf_PduIdType u16_PduId = BL_CANTP_CANIF_RX_PDU_ID;
+    Bl_CanIf_PduIdType u16_PduId = s_Bl_CanTp_Rx.u16_PduId;
 
     s_Bl_CanTp_Rx.u8_State = BL_CANTP_RX_IDLE;
 

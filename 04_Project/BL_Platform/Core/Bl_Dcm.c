@@ -32,7 +32,11 @@
  *                       [Modify] S3 session timeout: every accepted request
  *                       restarts the S3 timer (Bl_TimingManager); the
  *                       MainFunction checks expiry and resets the session to
- *                       default via Bl_Uds_ResetToDefaultSession
+ *                       default via Bl_Uds_ResetToDefaultSession;
+ *                       [Modify] functional addressing (0x7DF): requests on
+ *                       the functional channel are accepted only for
+ *                       TesterPresent 0x3E (refresh S3, NO response); all
+ *                       other services on 0x7DF are silently ignored
  */
 
 /****************************************************************
@@ -96,20 +100,35 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
                                 bl_uint32_t u32_SduLen)
 {
     const Bl_Dcm_Service_t *p_Info;
+    bl_uint8_t u8_FuncAddr;
     bl_uint8_t u8_Sid;
     bl_uint8_t u8_Sub;
-
-    (void)u16_PduId;
+    bl_uint32_t u32_DataLen;
 
     if ((p_Sdu == BL_NULL_PTR) || (u32_SduLen == 0U))
     {
         return;
     }
 
-    /* any valid diagnostic request refreshes the session timeout (S3) */
-    (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
+    /* functional addressing (0x7DF): only broadcast services are allowed,
+       and no response is sent (multi-ECU bus would be flooded otherwise).
+       TesterPresent 0x3E on the functional channel is handled inline (its
+       only effect is refreshing S3 — no other state to update). */
+    u8_FuncAddr = (u16_PduId == BL_CANTP_CANIF_FUNC_RX_PDU_ID) ? 1U : 0U;
 
     u8_Sid = p_Sdu[0];
+    if (u8_FuncAddr != 0U)
+    {
+        if (u8_Sid == BL_UDS_SID_TESTER_PRESENT)
+        {
+            /* valid functional TesterPresent: refresh S3 only, no response */
+            (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
+        }
+        return;     /* all other services on functional addressing: ignore */
+    }
+
+    /* any valid physical diagnostic request refreshes the session timeout (S3) */
+    (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
 
     p_Info = s_Bl_Dcm_FindService(u8_Sid);
     if (p_Info == BL_NULL_PTR)
@@ -118,21 +137,25 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
         return;
     }
 
-    if (u32_SduLen < p_Info->u8_MinLen)
+    /* data-segment length gate: data = request length minus SID and
+       sub-function. Protocol range check only (rejects clearly malformed
+       requests with 0x13); precise per-request validation stays in handlers.
+       min==max => fixed data length. */
+    u32_DataLen = u32_SduLen - 1U - p_Info->u8_SubFuncLen;
+    if ((u32_DataLen < p_Info->u8_MinDataLen) ||
+        (u32_DataLen > p_Info->u16_MaxDataLen))
     {
         Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_INCORRECT_MSG_LENGTH);
         return;
     }
 
-    /* sub-function gating (only for services that carry a sub-function byte) */
+    /* sub-function gating (only for services that carry a sub-function byte)
+       ISO 14229 sub-function is always 1 byte; the request may carry extra
+       data after it (e.g. 0x27 key, 0x34 address), so only the presence of
+       the field is checked here — value validity is enforced by the Uds
+       sub-service table (Bl_UdsService). */
     if (p_Info->u8_SubFuncLen > 0U)
     {
-        if (u32_SduLen < (1U + p_Info->u8_SubFuncLen))
-        {
-            Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_INCORRECT_MSG_LENGTH);
-            return;
-        }
-
         u8_Sub = p_Sdu[1] & 0x7FU;      /* strip the suppress-positive-response bit */
 
         /* sub-function not in the supported bitmap -> 0x12

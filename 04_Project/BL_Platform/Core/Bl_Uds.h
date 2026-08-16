@@ -113,6 +113,12 @@ void Bl_Uds_SendNrc(bl_uint8_t u8_Sid, bl_uint8_t u8_Nrc);
 /* ---- diagnostic service handlers (called by the Bl_Dcm dispatcher) ---- */
 
 void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);  /* 0x10 */
+
+/* 0x10 per-sub-service response functions (referenced by Bl_Uds_DiagSession_Lcfg.c) */
+void Bl_Uds_DiagSessionDefaultResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
+void Bl_Uds_DiagSessionProgrammingResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
+void Bl_Uds_DiagSessionExtendedResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
+
 void Bl_Uds_ECUReset(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);            /* 0x11 */
 void Bl_Uds_SecurityAccess(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);      /* 0x27 */
 void Bl_Uds_RequestDownload(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);     /* 0x34 */

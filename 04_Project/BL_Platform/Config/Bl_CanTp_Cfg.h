@@ -59,8 +59,9 @@ extern "C" {
 #define BL_CANTP_N_CR_TIMEOUT_MS        BL_TIMINGMANAGER_N_CR_TIMEOUT_MS   /**< RX: wait for next CF             */
 
 /** @brief CanIf PDU ids used by CanTp (diagnostic channel, see Bl_CanIf_Lcfg.c) */
-#define BL_CANTP_CANIF_RX_PDU_ID        BL_CANIF_PDU_ID_DIAG_RX   /**< 0x7E0 requests  */
-#define BL_CANTP_CANIF_TX_PDU_ID        BL_CANIF_PDU_ID_DIAG_TX   /**< 0x7E8 responses */
+#define BL_CANTP_CANIF_RX_PDU_ID        BL_CANIF_PDU_ID_DIAG_RX         /**< 0x7E0 physical requests */
+#define BL_CANTP_CANIF_FUNC_RX_PDU_ID   BL_CANIF_PDU_ID_DIAG_FUNC_RX    /**< 0x7DF functional requests */
+#define BL_CANTP_CANIF_TX_PDU_ID        BL_CANIF_PDU_ID_DIAG_TX         /**< 0x7E8 responses */
 
 /****************************************************************
  *                       Type Defs

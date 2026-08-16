@@ -64,13 +64,19 @@ typedef void (*Bl_Uds_ServiceFunc_t)(const bl_uint8_t *p_Req, bl_uint32_t u32_Re
  */
 typedef struct {
     bl_uint8_t           u8_Sid;             /**< service ID (main service byte, e.g. 0x10)           */
-    bl_uint8_t           u8_SubFuncLen;      /**< sub-function byte count (0x10 01 -> 1; 0 = none);
-                                                  reserved for per-service sub-function handling     */
+    bl_uint8_t           u8_SubFuncLen;      /**< sub-function byte count. ISO 14229 sub-function is
+                                                  ALWAYS 1 byte, so this is 0 (no sub-function) or 1 */
     bl_uint8_t           u8_SubFuncSupported;/**< sub-function bitmap (bit N = sub-function 0xN,
                                                   up to 0x07); 0xFF = any sub-function accepted      */
     bl_uint8_t           u8_SuppressBit;     /**< 1 = sub-function 0x80 (suppress positive response)
                                                   is allowed for this service                        */
-    bl_uint8_t           u8_MinLen;          /**< minimum request length                              */
+    bl_uint8_t           u8_MinDataLen;      /**< data-segment length MINIMUM (data = request length
+                                                  minus SID and sub-function). 0 for services with
+                                                  no data bytes.                                     */
+    bl_uint16_t          u16_MaxDataLen;     /**< data-segment length MAXIMUM; == MinDataLen means the
+                                                  data segment is fixed length. 16-bit because 0x36
+                                                  blocks can be 2049+ bytes. Protocol range gate only —
+                                                  precise per-request validation stays in the handler. */
     bl_uint8_t           u8_SessionMask;     /**< allowed sessions (bit N-1 = session N)              */
     bl_uint8_t           u8_SecurityNeeded;  /**< 1 = requires security access                         */
     bl_uint8_t           u8_P2Override;      /**< P2  override in ms (0xFF = use default from

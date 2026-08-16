@@ -671,6 +671,16 @@
               <FilePath>../BL_Platform/Core/Bl_Uds.h</FilePath>
             </File>
             <File>
+              <FileName>Bl_UdsService.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_UdsService.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_UdsService.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_UdsService.h</FilePath>
+            </File>
+            <File>
               <FileName>Bl_TimingManager.c</FileName>
               <FileType>1</FileType>
               <FilePath>../BL_Platform/Core/Bl_TimingManager.c</FilePath>
@@ -739,6 +749,16 @@
               <FileName>Bl_Uds_Cfg.h</FileName>
               <FileType>5</FileType>
               <FilePath>../BL_Platform/Config/Bl_Uds_Cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_UdsService_Lcfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Config/Bl_UdsService_Lcfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_UdsService_Lcfg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Config/Bl_UdsService_Lcfg.c</FilePath>
             </File>
             <File>
               <FileName>Bl_TimingManager_Cfg.h</FileName>

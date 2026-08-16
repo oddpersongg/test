@@ -30,7 +30,13 @@
  *                       bounded retry; self-heals rejected-Transmit window)
  *                       [Modify] P2/P2* advertisement in the 0x10 response now
  *                       reads Bl_TimingManager_GetTimeoutMs() at runtime
- *                       (centralized timing config, not compile-time macros)
+ *                       (centralized timing config, not compile-time macros);
+ *                       [Modify] 0x10 DiagnosticSessionControl is now a
+ *                       dispatcher: sub-service lookup in the centralized
+ *                       UDS sub-service table (Bl_UdsService_Lcfg.h/.c via
+ *                       Bl_UdsService_Find), configured session side effects
+ *                       applied, then jump to the per-sub-service response
+ *                       function (Default/Programming/Extended)
  */
 
 /****************************************************************
@@ -39,6 +45,7 @@
 #include "Bl_Uds.h"
 #include "Bl_CanTp.h"
 #include "Bl_TimingManager.h"
+#include "Bl_UdsService.h"
 
 /****************************************************************
  *                         Macros
@@ -101,6 +108,7 @@ static bl_uint8_t s_Bl_Uds_DlLastBlock = 0U;
 static void s_Bl_Uds_SendResponse(bl_uint8_t u8_Len);
 static bl_uint32_t s_Bl_Uds_ReadBytes(const bl_uint8_t *p_Src, bl_uint8_t u8_N);
 static void s_Bl_Uds_TxQueuePush(bl_uint8_t u8_Len);
+static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub);
 
 /****************************************************************
  *                 Global Variables
@@ -184,13 +192,18 @@ void Bl_Uds_SendNrc(bl_uint8_t u8_Sid, bl_uint8_t u8_Nrc)
 }
 
 /**
- * @brief  diagnostic session control (0x10)
+ * @brief  diagnostic session control (0x10) — dispatcher
+ * @note   Matches the request sub-function against the centralized UDS
+ *         sub-service config table (Bl_UdsService), applies the configured
+ *         state side effects (security / download reset), then jumps to the
+ *         per-sub-service response function.
  * @param  p_Req     : request SDU
  * @param  u32_ReqLen: request SDU length
  * @retval None
  */
 void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 {
+    const Bl_UdsService_SubCfg_t *p_Cfg;
     bl_uint8_t u8_Sub;
 
     if (u32_ReqLen < 2U)
@@ -200,21 +213,85 @@ void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
     }
 
     u8_Sub = p_Req[1];
-    if ((u8_Sub != BL_UDS_SESSION_DEFAULT) &&
-        (u8_Sub != BL_UDS_SESSION_PROGRAMMING) &&
-        (u8_Sub != BL_UDS_SESSION_EXTENDED))
+
+    /* look up the sub-service in the centralized UDS sub-service table */
+    p_Cfg = Bl_UdsService_Find(BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL,
+                               (bl_uint8_t)(u8_Sub & 0x7FU));
+    if (p_Cfg == BL_NULL_PTR)
     {
         Bl_Uds_SendNrc(BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
         return;
     }
 
-    /* session change resets security and any in-progress download */
-    s_Bl_Uds_Session       = u8_Sub;
-    s_Bl_Uds_SecurityLevel = 0U;
-    s_Bl_Uds_DlState       = BL_UDS_DL_STATE_IDLE;
-    s_Bl_Uds_DlAccepted    = 0U;
-    s_Bl_Uds_DlLastBlock   = 0U;
+    /* apply the configured session change side effects */
+    s_Bl_Uds_Session = p_Cfg->u8_SubFuncName;
+    if (p_Cfg->u8_ResetSecurity != 0U)
+    {
+        s_Bl_Uds_SecurityLevel = 0U;
+    }
+    if (p_Cfg->u8_ResetDownload != 0U)
+    {
+        s_Bl_Uds_DlState       = BL_UDS_DL_STATE_IDLE;
+        s_Bl_Uds_DlAccepted    = 0U;
+        s_Bl_Uds_DlLastBlock   = 0U;
+    }
 
+    /* jump to the per-sub-service response function */
+    if (p_Cfg->p_Func != BL_NULL_PTR)
+    {
+        p_Cfg->p_Func(p_Req, u32_ReqLen);
+    }
+}
+
+/**
+ * @brief  0x10 sub-service response: default session (0x50 01 + P2/P2*)
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_DiagSessionDefaultResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_DEFAULT);
+}
+
+/**
+ * @brief  0x10 sub-service response: programming session (0x50 02 + P2/P2*)
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_DiagSessionProgrammingResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_PROGRAMMING);
+}
+
+/**
+ * @brief  0x10 sub-service response: extended session (0x50 03 + P2/P2*)
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_DiagSessionExtendedResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_EXTENDED);
+}
+
+/**
+ * @brief  common 0x10 positive response (0x50 sub + P2 + P2*)
+ * @param  u8_Sub : session sub-function echoed in the response
+ * @retval None
+ */
+static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub)
+{
     s_Bl_Uds_Resp[0] = (bl_uint8_t)(BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL + 0x40U);
     s_Bl_Uds_Resp[1] = u8_Sub;
     /* P2 / P2* advertised at runtime from the centralized timing config */

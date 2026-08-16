@@ -1,10 +1,11 @@
 /**
  ******************************************************************************
- * @file    Bl_CanIf_Lcfg.c
+ * @file    Bl_UdsService_Lcfg.c
  * @author  -
  * @version V1.0.0
- * @date    2026-08-15
- * @brief   Bl_CanIf link-time configuration source file
+ * @date    2026-08-16
+ * @brief   Bl_UdsService link-time configuration source file
+ *          (centralized UDS sub-service config table definition)
  ******************************************************************************
  */
 
@@ -14,14 +15,15 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-15   [New] module created, PDU config table;
- *                       V1.0.0 (2026-08-16): diagnostic PDUs 0x7E0 RX / 0x7E8 TX
+ * V1.0.0   2026-08-16   [New] module created, centralized UDS sub-service
+ *                       table (0x10: default/programming/extended sessions)
  */
 
 /****************************************************************
  *                        Includes
  ***************************************************************/
-#include "Bl_CanIf_Lcfg.h"
+#include "Bl_UdsService_Lcfg.h"
+#include "Bl_Uds.h"     /* sub-service response function declarations */
 
 /****************************************************************
  *                         Macros
@@ -44,19 +46,18 @@
  ***************************************************************/
 
 /**
- * @brief CanIf PDU configuration table (UDS standard addressing)
- * @note  DIAG_RX = 0x7E0 (physical diagnostic requests, routed to CanTp),
- *        DIAG_FUNC_RX = 0x7DF (functional requests — broadcast services only,
- *        e.g. 0x3E TesterPresent; no response on functional addressing),
- *        DIAG_TX = 0x7E8 (physical responses / flow control to tester).
- *        HOH 1 is the driver's accept-all RX HOH; HOH 0 is the TX HOH.
+ * @brief centralized UDS sub-service config table
+ * @note  Edit this table to add / remove / re-configure sub-functions for any
+ *        service. Each entry: sid | subFunc | subFuncName | resetSecurity |
+ *        resetDownload | respDataLen | response function.
+ *        0x10: session sub-functions.
  */
-const Bl_CanIf_PduConfigType g_Bl_CanIf_PduConfig[BL_CANIF_PDU_CNT] =
+const Bl_UdsService_SubCfg_t g_Bl_UdsService_SubConfig[BL_UDSSERVICE_SUB_CNT] =
 {
-    /* PduId                     hoh  CanId    mask    dir       */
-    { BL_CANIF_PDU_ID_DIAG_RX,     1U, 0x7E0U, 0x7FFU, BL_CANIF_DIR_RX },
-    { BL_CANIF_PDU_ID_DIAG_TX,     0U, 0x7E8U, 0x7FFU, BL_CANIF_DIR_TX },
-    { BL_CANIF_PDU_ID_DIAG_FUNC_RX, 1U, 0x7DFU, 0x7FFU, BL_CANIF_DIR_RX },
+    /* sid  sub  name                   resetSec resetDl respDataLen func                            */
+    { 0x10U, 0x01U, BL_UDS_SESSION_DEFAULT,    1U,   1U,    4U, Bl_Uds_DiagSessionDefaultResp },
+    { 0x10U, 0x02U, BL_UDS_SESSION_PROGRAMMING, 1U,   1U,    4U, Bl_Uds_DiagSessionProgrammingResp },
+    { 0x10U, 0x03U, BL_UDS_SESSION_EXTENDED,    1U,   1U,    4U, Bl_Uds_DiagSessionExtendedResp },
 };
 
 /****************************************************************
