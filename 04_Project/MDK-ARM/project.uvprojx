@@ -605,6 +605,21 @@
               <FileType>5</FileType>
               <FilePath>../BL_Platform/Apdapter/Bl_Isr.h</FilePath>
             </File>
+            <File>
+              <FileName>Bl_Fls.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Apdapter/Bl_Fls.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Fls.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Apdapter/Bl_Fls.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_Fls_Cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Apdapter/Bl_Fls_Cfg.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -689,6 +704,16 @@
               <FileName>Bl_TimingManager.h</FileName>
               <FileType>5</FileType>
               <FilePath>../BL_Platform/Core/Bl_TimingManager.h</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_FlashIf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../BL_Platform/Core/Bl_FlashIf.c</FilePath>
+            </File>
+            <File>
+              <FileName>Bl_FlashIf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>../BL_Platform/Core/Bl_FlashIf.h</FilePath>
             </File>
           </Files>
         </Group>

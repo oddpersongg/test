@@ -24,6 +24,7 @@
  *                       [New] Bl_DriverAdapter_SystemReset added: adapter-layer
  *                       system reset for UDS 0x11 (maps reset types to
  *                       NVIC_SystemReset on STM32F1)
+ *                       [New] Fls init added for the AUTOSAR Bl_Fls driver
  */
 
 /****************************************************************
@@ -31,6 +32,7 @@
  ***************************************************************/
 #include "Bl_DriverAdapter.h"
 #include "Bl_Can.h"
+#include "Bl_Fls.h"
 #include "main.h"
 
 /****************************************************************
@@ -97,6 +99,14 @@ static bl_ret_t s_Bl_DriverAdapter_CanInit(void);
  */
 static bl_ret_t s_Bl_DriverAdapter_CanDeinit(void);
 
+/**
+ * @brief  init Fls driver (AUTOSAR internal flash)
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_FlsInit(void);
+
 /****************************************************************
  *                 Global Variables
  ***************************************************************/
@@ -118,6 +128,7 @@ bl_ret_t Bl_DriverAdapter_Init(void)
     e_Ret  = s_Bl_DriverAdapter_CddInit();
     e_Ret |= s_Bl_DriverAdapter_TimerInit();
     e_Ret |= s_Bl_DriverAdapter_CanInit();
+    e_Ret |= s_Bl_DriverAdapter_FlsInit();
 
     return e_Ret;
 }
@@ -257,6 +268,19 @@ static bl_ret_t s_Bl_DriverAdapter_CanDeinit(void)
 {
     /* User Add Begin */
     return Bl_Can_DeInit();
+    /* User Add End */
+}
+
+/**
+ * @brief  init Fls driver (AUTOSAR internal flash)
+ * @param  None
+ * @retval BL_E_OK     : success
+ * @retval BL_E_NOT_OK : failure
+ */
+static bl_ret_t s_Bl_DriverAdapter_FlsInit(void)
+{
+    /* User Add Begin */
+    return Bl_Fls_Init();
     /* User Add End */
 }
 

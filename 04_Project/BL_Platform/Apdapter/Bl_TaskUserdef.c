@@ -20,6 +20,9 @@
  *                       overrides are removed — the CanIf hooks are back to
  *                       pure weak no-ops in Core, ready for the CanTp layer to
  *                       take over the RX/TX path
+ *                       [Remove] one-shot flash test task (erased the app-area
+ *                       first sector on every boot) removed after the
+ *                       Bl_Fls / Bl_FlashIf bring-up test passed on hardware
  */
 
 /****************************************************************
