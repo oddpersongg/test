@@ -17,7 +17,10 @@
  * V1.0.0   2026-08-13   [New] module created, download buffer reserved;
  *                       V1.0.0 (2026-08-16) dispatcher role: discriminates the
  *                       service (SID) and calls the handler implemented in
- *                       Bl_Uds; keeps the download / reassembly buffer
+ *                       Bl_Uds; keeps the download / reassembly buffer;
+ *                       [Modify] Bl_Dcm_MainFunction added: periodic driver
+ *                       of the UDS response TX queue (AUTOSAR Dcm_MainFunction
+ *                       style), replaces callback-only flush
  */
 
 /****************************************************************
@@ -60,6 +63,17 @@ extern bl_uint8_t BL_DCM_BUFFER_SIZE[BL_DCM_BUFFER_LEN];
 /****************************************************************
  *                Function Declarations
  ***************************************************************/
+
+/**
+ * @brief  Dcm cyclic function (AUTOSAR Dcm_MainFunction style)
+ * @note   Periodically called from the scheduler main loop. Drives the
+ *         UDS response TX queue (bounded retry when CanTp is busy), which
+ *         keeps back-to-back responses ordered and self-heals a rejected
+ *         Transmit window.
+ * @param  None
+ * @retval None
+ */
+void Bl_Dcm_MainFunction(void);
 
 #ifdef __cplusplus
 }

@@ -25,7 +25,14 @@
  *                       gating (NRC 0x12) added to the dispatch checks;
  *                       [Modify] service table (type + data) moved to the
  *                       Config layer (Bl_Dcm_Lcfg.h/.c), dispatcher now reads
- *                       g_Bl_Dcm_ServiceConfig
+ *                       g_Bl_Dcm_ServiceConfig;
+ *                       [Modify] Bl_Dcm_MainFunction added: periodic driver
+ *                       of the UDS response TX queue (AUTOSAR
+ *                       Dcm_MainFunction style);
+ *                       [Modify] S3 session timeout: every accepted request
+ *                       restarts the S3 timer (Bl_TimingManager); the
+ *                       MainFunction checks expiry and resets the session to
+ *                       default via Bl_Uds_ResetToDefaultSession
  */
 
 /****************************************************************
@@ -35,6 +42,7 @@
 #include "Bl_Dcm_Lcfg.h"
 #include "Bl_CanTp.h"
 #include "Bl_Uds.h"
+#include "Bl_TimingManager.h"
 
 /****************************************************************
  *                         Macros
@@ -98,6 +106,9 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
         return;
     }
 
+    /* any valid diagnostic request refreshes the session timeout (S3) */
+    (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
+
     u8_Sid = p_Sdu[0];
 
     p_Info = s_Bl_Dcm_FindService(u8_Sid);
@@ -155,6 +166,29 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
     }
 
     p_Info->p_Func(p_Sdu, u32_SduLen);
+}
+
+/**
+ * @brief  Dcm cyclic function (AUTOSAR Dcm_MainFunction style)
+ * @note   Periodically called from the scheduler main loop (after CanTp).
+ *         Drives the UDS response TX queue: when CanTp is busy (single
+ *         session) the head response is retried on every call, keeping
+ *         back-to-back responses ordered and self-healing a rejected
+ *         Transmit window. All UDS state (session/security/download) lives
+ *         in Bl_Uds; Dcm only discriminates and dispatches.
+ * @param  None
+ * @retval None
+ */
+void Bl_Dcm_MainFunction(void)
+{
+    Bl_Uds_ProcessResponseQueue();
+
+    /* S3 session timeout: no request for S3_TIMEOUT_MS -> back to default
+       session (security + download state reset by the Uds layer) */
+    if (Bl_TimingManager_IsExpired(BL_TIMINGMANAGER_TIMER_S3) != 0U)
+    {
+        Bl_Uds_ResetToDefaultSession();
+    }
 }
 
 /****************************************************************

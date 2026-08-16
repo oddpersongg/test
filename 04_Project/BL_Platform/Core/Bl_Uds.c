@@ -24,6 +24,13 @@
  *                       send path ignored the result. Responses are now queued
  *                       and flushed on Bl_CanTp_UpperTxConfirmation, preserving
  *                       order. Overrides Bl_CanTp_UpperTxConfirmation.
+ *                       [Modify] queue flush exposed as Bl_Uds_ProcessResponseQueue()
+ *                       and additionally driven periodically by
+ *                       Bl_Dcm_MainFunction() (AUTOSAR Dcm_MainFunction style
+ *                       bounded retry; self-heals rejected-Transmit window)
+ *                       [Modify] P2/P2* advertisement in the 0x10 response now
+ *                       reads Bl_TimingManager_GetTimeoutMs() at runtime
+ *                       (centralized timing config, not compile-time macros)
  */
 
 /****************************************************************
@@ -31,6 +38,7 @@
  ***************************************************************/
 #include "Bl_Uds.h"
 #include "Bl_CanTp.h"
+#include "Bl_TimingManager.h"
 
 /****************************************************************
  *                         Macros
@@ -93,7 +101,6 @@ static bl_uint8_t s_Bl_Uds_DlLastBlock = 0U;
 static void s_Bl_Uds_SendResponse(bl_uint8_t u8_Len);
 static bl_uint32_t s_Bl_Uds_ReadBytes(const bl_uint8_t *p_Src, bl_uint8_t u8_N);
 static void s_Bl_Uds_TxQueuePush(bl_uint8_t u8_Len);
-static void s_Bl_Uds_TxFlush(void);
 
 /****************************************************************
  *                 Global Variables
@@ -121,6 +128,9 @@ bl_ret_t Bl_Uds_Init(void)
     s_Bl_Uds_TxHead        = 0U;
     s_Bl_Uds_TxCount       = 0U;
 
+    /* start the S3 session timer (refreshed on every request by Dcm) */
+    (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
+
     return BL_E_OK;
 }
 
@@ -132,6 +142,20 @@ bl_ret_t Bl_Uds_Init(void)
 bl_uint8_t Bl_Uds_GetSession(void)
 {
     return s_Bl_Uds_Session;
+}
+
+/**
+ * @brief  reset to the default diagnostic session (S3 timeout)
+ * @param  None
+ * @retval None
+ */
+void Bl_Uds_ResetToDefaultSession(void)
+{
+    s_Bl_Uds_Session       = BL_UDS_SESSION_DEFAULT;
+    s_Bl_Uds_SecurityLevel = 0U;
+    s_Bl_Uds_DlState       = BL_UDS_DL_STATE_IDLE;
+    s_Bl_Uds_DlAccepted    = 0U;
+    s_Bl_Uds_DlLastBlock   = 0U;
 }
 
 /**
@@ -193,10 +217,11 @@ void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 
     s_Bl_Uds_Resp[0] = (bl_uint8_t)(BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL + 0x40U);
     s_Bl_Uds_Resp[1] = u8_Sub;
-    s_Bl_Uds_Resp[2] = (bl_uint8_t)(BL_UDS_P2_DEFAULT_MS >> 8U);
-    s_Bl_Uds_Resp[3] = (bl_uint8_t)(BL_UDS_P2_DEFAULT_MS & 0xFFU);
-    s_Bl_Uds_Resp[4] = (bl_uint8_t)(BL_UDS_P2STAR_DEFAULT_MS >> 8U);
-    s_Bl_Uds_Resp[5] = (bl_uint8_t)(BL_UDS_P2STAR_DEFAULT_MS & 0xFFU);
+    /* P2 / P2* advertised at runtime from the centralized timing config */
+    s_Bl_Uds_Resp[2] = (bl_uint8_t)(Bl_TimingManager_GetTimeoutMs(BL_TIMINGMANAGER_TIMER_P2) >> 8U);
+    s_Bl_Uds_Resp[3] = (bl_uint8_t)(Bl_TimingManager_GetTimeoutMs(BL_TIMINGMANAGER_TIMER_P2) & 0xFFU);
+    s_Bl_Uds_Resp[4] = (bl_uint8_t)(Bl_TimingManager_GetTimeoutMs(BL_TIMINGMANAGER_TIMER_P2STAR) >> 8U);
+    s_Bl_Uds_Resp[5] = (bl_uint8_t)(Bl_TimingManager_GetTimeoutMs(BL_TIMINGMANAGER_TIMER_P2STAR) & 0xFFU);
 
     s_Bl_Uds_SendResponse(6U);
 }
@@ -499,7 +524,39 @@ void Bl_CanTp_UpperTxConfirmation(Bl_CanIf_PduIdType u16_PduId,
         s_Bl_Uds_TxCount--;
     }
 
-    s_Bl_Uds_TxFlush();
+    Bl_Uds_ProcessResponseQueue();
+}
+
+/**
+ * @brief  process the response TX queue (AUTOSAR Dcm_MainFunction style)
+ * @note   Periodically called by Bl_Dcm_MainFunction() (and directly after
+ *         enqueue / TxConfirmation). If CanTp is busy (single session), the
+ *         head response stays queued and is retried on the next call — this
+ *         is the bounded retry that replaces dropping on back-to-back
+ *         requests, and it also self-heals the "CanTp busy without a pending
+ *         confirmation" window (e.g. a rejected Transmit).
+ * @param  None
+ * @retval None
+ */
+void Bl_Uds_ProcessResponseQueue(void)
+{
+    if (s_Bl_Uds_TxCount == 0U)
+    {
+        return;
+    }
+
+    /* a response is already in flight: wait for its confirmation */
+    if (s_Bl_Uds_TxInFlight != 0U)
+    {
+        return;
+    }
+
+    if (Bl_CanTp_Transmit(BL_CANTP_CANIF_TX_PDU_ID,
+                          s_Bl_Uds_TxQueue[s_Bl_Uds_TxHead].p_Data,
+                          s_Bl_Uds_TxQueue[s_Bl_Uds_TxHead].u8_Len) == BL_E_OK)
+    {
+        s_Bl_Uds_TxInFlight = 1U;
+    }
 }
 
 /****************************************************************
@@ -522,7 +579,7 @@ static void s_Bl_Uds_SendResponse(bl_uint8_t u8_Len)
     }
 
     s_Bl_Uds_TxQueuePush(u8_Len);
-    s_Bl_Uds_TxFlush();
+    Bl_Uds_ProcessResponseQueue();
 }
 
 /**
@@ -549,37 +606,6 @@ static void s_Bl_Uds_TxQueuePush(bl_uint8_t u8_Len)
         s_Bl_Uds_TxQueue[u8_Tail].p_Data[i] = s_Bl_Uds_Resp[i];
     }
     s_Bl_Uds_TxCount++;
-}
-
-/**
- * @brief  try to transmit the head of the response TX queue
- * @note   If CanTp is busy (single session), the response stays queued and
- *         this function is re-invoked from Bl_CanTp_UpperTxConfirmation.
- *         When accepted, the head is marked in-flight and popped on the
- *         matching TxConfirmation (the queue slot must stay valid while
- *         CanTp owns the SDU pointer, e.g. multi-frame responses).
- * @param  None
- * @retval None
- */
-static void s_Bl_Uds_TxFlush(void)
-{
-    if (s_Bl_Uds_TxCount == 0U)
-    {
-        return;
-    }
-
-    /* a response is already in flight: wait for its confirmation */
-    if (s_Bl_Uds_TxInFlight != 0U)
-    {
-        return;
-    }
-
-    if (Bl_CanTp_Transmit(BL_CANTP_CANIF_TX_PDU_ID,
-                          s_Bl_Uds_TxQueue[s_Bl_Uds_TxHead].p_Data,
-                          s_Bl_Uds_TxQueue[s_Bl_Uds_TxHead].u8_Len) == BL_E_OK)
-    {
-        s_Bl_Uds_TxInFlight = 1U;
-    }
 }
 
 /**

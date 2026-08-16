@@ -74,8 +74,13 @@ typedef struct {
     bl_uint8_t           u8_SessionMask;     /**< allowed sessions (bit N-1 = session N)              */
     bl_uint8_t           u8_SecurityNeeded;  /**< 1 = requires security access                         */
     bl_uint8_t           u8_P2Override;      /**< P2  override in ms (0xFF = use default from
-                                                  Bl_TimingManager; consumed by Dcm for slow services) */
-    bl_uint8_t           u8_P2StarOverride;  /**< P2* override in ms (0xFF = use default)              */
+                                                  Bl_TimingManager). Reserved for the 0x78
+                                                  pending-response path (Dcm): when a service
+                                                  runs past P2, Dcm sends 0x78 first and the
+                                                  final response within P2* — per-service
+                                                  overrides are consumed there.                */
+    bl_uint8_t           u8_P2StarOverride;  /**< P2* override in ms (0xFF = use default);
+                                                  same consumer as u8_P2Override              */
     bl_uint8_t           u8_RespDataLen;     /**< positive-response data length (excluding SID +
                                                   sub-function); fixed for constant-length services,
                                                   upper bound for variable-length ones                */

@@ -31,6 +31,8 @@
 #include "Bl_Can.h"
 /* CanTp (Core) cyclic: timeouts + STmin pacing */
 #include "Bl_CanTp.h"
+/* Dcm (Core) cyclic: UDS response TX queue (AUTOSAR Dcm_MainFunction) */
+#include "Bl_Dcm.h"
 
 /****************************************************************
  *                         Macros
@@ -236,6 +238,9 @@ void Bl_TaskSchedule_MainFunction(void)
 
         /* CanTp cyclic processing (timeouts, STmin pacing) */
         Bl_CanTp_MainFunction();
+
+        /* Dcm cyclic processing (UDS response TX queue, AUTOSAR style) */
+        Bl_Dcm_MainFunction();
     }
 }
 

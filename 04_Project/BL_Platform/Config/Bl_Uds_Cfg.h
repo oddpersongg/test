@@ -70,7 +70,9 @@ extern "C" {
 #define BL_UDS_NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION 0x7FU
 
 /** @brief response timing (ms) advertised in the 0x10 response — aliases of
- *         the centralized Bl_TimingManager values */
+ *         the centralized Bl_TimingManager values. Kept for compatibility;
+ *         the 0x10 handler reads the values at runtime via
+ *         Bl_TimingManager_GetTimeoutMs() instead of these macros. */
 #define BL_UDS_P2_DEFAULT_MS             BL_TIMINGMANAGER_P2_TIMEOUT_MS
 #define BL_UDS_P2STAR_DEFAULT_MS         BL_TIMINGMANAGER_P2STAR_TIMEOUT_MS
 

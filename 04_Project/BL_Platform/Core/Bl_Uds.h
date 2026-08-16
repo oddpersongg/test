@@ -76,11 +76,31 @@ bl_ret_t Bl_Uds_Init(void);
 bl_uint8_t Bl_Uds_GetSession(void);
 
 /**
+ * @brief  reset to the default diagnostic session
+ * @note   Called by the Dcm layer on S3 session timeout. Clears security
+ *         level and any in-progress download (same as a 0x10 01 request
+ *         would do), but does not send a response.
+ * @param  None
+ * @retval None
+ */
+void Bl_Uds_ResetToDefaultSession(void);
+
+/**
  * @brief  get the current security level (0 = locked)
  * @param  None
  * @retval security level
  */
 bl_uint8_t Bl_Uds_GetSecurityLevel(void);
+
+/**
+ * @brief  process the response TX queue (driven by Bl_Dcm_MainFunction)
+ * @note   AUTOSAR Dcm_MainFunction style: periodically retries transmitting
+ *         the head queued response when CanTp is busy (single session).
+ *         Also invoked after enqueue and on TxConfirmation.
+ * @param  None
+ * @retval None
+ */
+void Bl_Uds_ProcessResponseQueue(void);
 
 /**
  * @brief  send a negative response (0x7F SID NRC)
