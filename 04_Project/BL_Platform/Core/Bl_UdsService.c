@@ -50,6 +50,8 @@
 
 /**
  * @brief  find a sub-service config entry by (SID, sub-function)
+ * @note   Resolves the SID through the service index table, then searches
+ *         that service's own sub-service table for the sub-function value.
  * @param  u8_Sid : service ID
  * @param  u8_Sub : sub-function value (without the suppress bit)
  * @retval pointer to the config entry, or BL_NULL_PTR if not found
@@ -57,14 +59,29 @@
 const Bl_UdsService_SubCfg_t *Bl_UdsService_Find(bl_uint8_t u8_Sid,
                                                  bl_uint8_t u8_Sub)
 {
+    const Bl_UdsService_SvcIndex_t *p_Svc = BL_NULL_PTR;
     bl_uint8_t i;
 
-    for (i = 0U; i < BL_UDSSERVICE_SUB_CNT; i++)
+    /* 1. find the service in the index table */
+    for (i = 0U; i < BL_UDSSERVICE_SVC_CNT; i++)
     {
-        if ((g_Bl_UdsService_SubConfig[i].u8_Sid == u8_Sid) &&
-            (g_Bl_UdsService_SubConfig[i].u8_SubFunc == u8_Sub))
+        if (g_Bl_UdsService_SvcIndex[i].u8_Sid == u8_Sid)
         {
-            return &g_Bl_UdsService_SubConfig[i];
+            p_Svc = &g_Bl_UdsService_SvcIndex[i];
+            break;
+        }
+    }
+    if (p_Svc == BL_NULL_PTR)
+    {
+        return BL_NULL_PTR;
+    }
+
+    /* 2. search the service's sub-service table */
+    for (i = 0U; i < p_Svc->u8_SubCnt; i++)
+    {
+        if (p_Svc->p_SubTable[i].u8_SubFunc == u8_Sub)
+        {
+            return &p_Svc->p_SubTable[i];
         }
     }
     return BL_NULL_PTR;

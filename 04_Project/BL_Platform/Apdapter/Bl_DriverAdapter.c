@@ -21,6 +21,9 @@
  *                       [New] Deinit added for module de-initialization
  *                       [Modify] TIM1 callback migrated to Bl_Isr
  *                       [New] Can init/deinit added for Bl_Can module
+ *                       [New] Bl_DriverAdapter_SystemReset added: adapter-layer
+ *                       system reset for UDS 0x11 (maps reset types to
+ *                       NVIC_SystemReset on STM32F1)
  */
 
 /****************************************************************
@@ -134,6 +137,37 @@ bl_ret_t Bl_DriverAdapter_Deinit(void)
     e_Ret |= s_Bl_DriverAdapter_CanDeinit();
 
     return e_Ret;
+}
+
+/**
+ * @brief  system reset through the adapter layer (chip-specific)
+ * @param  u8_ResetType : reset type (0x01 hard / 0x02 key-off-on /
+ *                        0x03 soft / 0x04 fast-soft)
+ * @retval BL_E_OK     : reset issued (never returns on success)
+ * @retval BL_E_NOT_OK : reset type not supported
+ */
+bl_ret_t Bl_DriverAdapter_SystemReset(bl_uint8_t u8_ResetType)
+{
+    switch (u8_ResetType)
+    {
+    case 0x01U:     /* hard reset */
+    case 0x02U:     /* key off/on reset (simulated: no power control on this HW) */
+    case 0x03U:     /* soft reset */
+    case 0x04U:     /* fast soft reset */
+        /* User Add Begin */
+        NVIC_SystemReset();
+        /* User Add End */
+        break;
+
+    default:
+        return BL_E_NOT_OK;
+    }
+
+    /* NVIC_SystemReset() never returns on success; trap here to keep the
+       compiler honest and catch a disabled/waiting reset */
+    while (1)
+    {
+    }
 }
 
 /****************************************************************

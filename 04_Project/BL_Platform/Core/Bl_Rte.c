@@ -18,6 +18,8 @@
  *                       adapter (SysInit/Deinit) + scheduler + TimingManager
  *                       + CanIf + CanTp + Uds (ProcessInit/Deinit) + user
  *                       tasks, reverse order
+ *                       [New] Bl_Rte_SystemReset added: RTE entry that
+ *                       delegates the UDS 0x11 reset to the adapter layer
  */
 
 /****************************************************************
@@ -95,6 +97,17 @@ bl_ret_t Bl_Rte_Deinit(void)
     e_Ret |= s_Bl_Rte_SysDeinit();
 
     return e_Ret;
+}
+
+/**
+ * @brief  system reset through the RTE (delegates to the adapter layer)
+ * @param  u8_ResetType : reset type, forwarded verbatim
+ * @retval BL_E_OK     : reset issued (never returns on success)
+ * @retval BL_E_NOT_OK : reset type not supported by the adapter
+ */
+bl_ret_t Bl_Rte_SystemReset(bl_uint8_t u8_ResetType)
+{
+    return Bl_DriverAdapter_SystemReset(u8_ResetType);
 }
 
 /****************************************************************

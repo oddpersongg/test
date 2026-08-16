@@ -5,7 +5,7 @@
  * @version V1.0.0
  * @date    2026-08-16
  * @brief   Bl_UdsService link-time configuration source file
- *          (centralized UDS sub-service config table definition)
+ *          (per-service UDS sub-service config tables + service index)
  ******************************************************************************
  */
 
@@ -15,8 +15,10 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-16   [New] module created, centralized UDS sub-service
- *                       table (0x10: default/programming/extended sessions)
+ * V1.0.0   2026-08-16   [New] module created, per-service sub-service tables:
+ *                       0x10 sessions (default/programming/extended) and
+ *                       0x11 reset types (hard/keyOffOn/soft/fastSoft), plus
+ *                       the service index table
  */
 
 /****************************************************************
@@ -46,18 +48,41 @@
  ***************************************************************/
 
 /**
- * @brief centralized UDS sub-service config table
- * @note  Edit this table to add / remove / re-configure sub-functions for any
- *        service. Each entry: sid | subFunc | subFuncName | resetSecurity |
- *        resetDownload | respDataLen | response function.
- *        0x10: session sub-functions.
+ * @brief 0x10 DiagnosticSessionControl sub-service table
+ * @note  Edit to add / remove / re-configure session sub-functions.
+ *        Columns: subFunc | name | resetSecurity | resetDownload | respDataLen
+ *        | response function.
  */
-const Bl_UdsService_SubCfg_t g_Bl_UdsService_SubConfig[BL_UDSSERVICE_SUB_CNT] =
+const Bl_UdsService_SubCfg_t g_Bl_UdsService_DiagSessionSubConfig[BL_UDSSERVICE_DIAGSESSION_SUB_CNT] =
 {
-    /* sid  sub  name                   resetSec resetDl respDataLen func                            */
-    { 0x10U, 0x01U, BL_UDS_SESSION_DEFAULT,    1U,   1U,    4U, Bl_Uds_DiagSessionDefaultResp },
-    { 0x10U, 0x02U, BL_UDS_SESSION_PROGRAMMING, 1U,   1U,    4U, Bl_Uds_DiagSessionProgrammingResp },
-    { 0x10U, 0x03U, BL_UDS_SESSION_EXTENDED,    1U,   1U,    4U, Bl_Uds_DiagSessionExtendedResp },
+    /* sub  name                   resetSec resetDl respDataLen func                            */
+    { 0x01U, BL_UDS_SESSION_DEFAULT,    1U,   1U,    4U, Bl_Uds_DiagSessionDefaultResp },
+    { 0x02U, BL_UDS_SESSION_PROGRAMMING, 1U,   1U,    4U, Bl_Uds_DiagSessionProgrammingResp },
+    { 0x03U, BL_UDS_SESSION_EXTENDED,    1U,   1U,    4U, Bl_Uds_DiagSessionExtendedResp },
+};
+
+/**
+ * @brief 0x11 ECUReset sub-service table
+ * @note  Edit to add / remove / re-configure reset types.
+ */
+const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECURESET_SUB_CNT] =
+{
+    /* sub  name  resetSec resetDl respDataLen func                            */
+    { 0x01U, 0x01U,  0U,   0U,    0U, Bl_Uds_EcuResetHardResp },
+    { 0x02U, 0x02U,  0U,   0U,    0U, Bl_Uds_EcuResetKeyOffOnResp },
+    { 0x03U, 0x03U,  0U,   0U,    0U, Bl_Uds_EcuResetSoftResp },
+    { 0x04U, 0x04U,  0U,   0U,    0U, Bl_Uds_EcuResetFastSoftResp },
+};
+
+/**
+ * @brief service index table: SID -> its sub-service table
+ * @note  Edit to register a new service's sub-service table.
+ */
+const Bl_UdsService_SvcIndex_t g_Bl_UdsService_SvcIndex[BL_UDSSERVICE_SVC_CNT] =
+{
+    /* sid  sub-table                        cnt  */
+    { 0x10U, g_Bl_UdsService_DiagSessionSubConfig, BL_UDSSERVICE_DIAGSESSION_SUB_CNT },
+    { 0x11U, g_Bl_UdsService_EcuResetSubConfig,    BL_UDSSERVICE_ECURESET_SUB_CNT },
 };
 
 /****************************************************************

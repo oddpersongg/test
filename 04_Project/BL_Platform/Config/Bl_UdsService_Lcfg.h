@@ -5,7 +5,7 @@
  * @version V1.0.0
  * @date    2026-08-16
  * @brief   Bl_UdsService link-time configuration header file
- *          (centralized UDS sub-service config table)
+ *          (per-service UDS sub-service config tables + service index)
  ******************************************************************************
  */
 
@@ -15,12 +15,15 @@
 /**
  * Version  Date        Description
  * -------- ------------ ----------------------------------------------------
- * V1.0.0   2026-08-16   [New] module created, centralized UDS sub-service
- *                       table: one table holds every service's sub-functions
- *                       (0x10 sessions, 0x27 security levels, ...). Each entry
- *                       binds a (SID, sub-function) pair to its response
- *                       function; Bl_UdsService finds and dispatches.
+ * V1.0.0   2026-08-16   [New] module created, per-service UDS sub-service
+ *                       tables (0x10 sessions, 0x11 reset types, ...) plus a
+ *                       service index table. Each service's sub-functions live
+ *                       in its own const table; Bl_UdsService_Find resolves
+ *                       (SID, sub) via the index then searches that table.
  *                       Merged from the former Bl_Uds_DiagSession_Lcfg.
+ *                       [Modify] split the single big table into per-service
+ *                       tables + service index for config isolation and
+ *                       readability
  */
 
 /****************************************************************
@@ -43,8 +46,12 @@ extern "C" {
  *                         Macros
  ***************************************************************/
 
-/** @brief number of sub-service table entries (SID+subFunc pairs) */
-#define BL_UDSSERVICE_SUB_CNT   3U
+/** @brief number of services that have sub-service tables (index entries) */
+#define BL_UDSSERVICE_SVC_CNT   2U
+
+/** @brief sub-service entry counts per service */
+#define BL_UDSSERVICE_DIAGSESSION_SUB_CNT   3U   /**< 0x10 sessions       */
+#define BL_UDSSERVICE_ECURESET_SUB_CNT      4U   /**< 0x11 reset types    */
 
 /****************************************************************
  *                       Type Defs
@@ -61,27 +68,40 @@ typedef void (*Bl_UdsService_SubFunc_t)(const bl_uint8_t *p_Req,
 
 /**
  * @brief UDS sub-service config entry (one per supported sub-function)
- * @note  Binds a (service SID, sub-function value) pair to its dedicated
- *        response function. Service-specific side-effect flags (reset
- *        security / download on session change, security-level pairing for
- *        0x27, etc.) can be added per service as the table grows.
+ * @note  Binds a sub-function value to its dedicated response function, plus
+ *        service-specific side-effect flags (reset security / download on
+ *        session change, etc.).
  */
 typedef struct {
-    bl_uint8_t              u8_Sid;        /**< service ID (e.g. 0x10)             */
-    bl_uint8_t              u8_SubFunc;    /**< sub-function value (0x01/0x02/...) */
-    bl_uint8_t              u8_SubFuncName;/**< semantic name/level of the sub-func */
-    bl_uint8_t              u8_ResetSecurity; /**< 1 = clear security on this sub  */
-    bl_uint8_t              u8_ResetDownload; /**< 1 = clear download on this sub  */
-    bl_uint8_t              u8_RespDataLen;   /**< positive-resp data len (excl. SID+sub) */
+    bl_uint8_t              u8_SubFunc;        /**< sub-function value (0x01/0x02/...) */
+    bl_uint8_t              u8_SubFuncName;    /**< semantic name/level of the sub-func */
+    bl_uint8_t              u8_ResetSecurity;  /**< 1 = clear security on this sub      */
+    bl_uint8_t              u8_ResetDownload;  /**< 1 = clear download on this sub      */
+    bl_uint8_t              u8_RespDataLen;    /**< positive-resp data len (excl. SID+sub) */
     Bl_UdsService_SubFunc_t p_Func;            /**< per-sub-service response function    */
 } Bl_UdsService_SubCfg_t;
+
+/**
+ * @brief service index entry: maps a SID to its sub-service table
+ */
+typedef struct {
+    bl_uint8_t                  u8_Sid;    /**< service ID (e.g. 0x10)          */
+    const Bl_UdsService_SubCfg_t *p_SubTable; /**< this service's sub table      */
+    bl_uint8_t                  u8_SubCnt; /**< entries in the sub table        */
+} Bl_UdsService_SvcIndex_t;
 
 /****************************************************************
  *                 Global Variables
  ***************************************************************/
 
-/** @brief centralized UDS sub-service config table (link-time const, defined in Bl_UdsService_Lcfg.c) */
-extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_SubConfig[BL_UDSSERVICE_SUB_CNT];
+/** @brief 0x10 session sub-service table (defined in Bl_UdsService_Lcfg.c) */
+extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_DiagSessionSubConfig[BL_UDSSERVICE_DIAGSESSION_SUB_CNT];
+
+/** @brief 0x11 reset sub-service table (defined in Bl_UdsService_Lcfg.c) */
+extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECURESET_SUB_CNT];
+
+/** @brief service index table (defined in Bl_UdsService_Lcfg.c) */
+extern const Bl_UdsService_SvcIndex_t g_Bl_UdsService_SvcIndex[BL_UDSSERVICE_SVC_CNT];
 
 /****************************************************************
  *                Function Declarations

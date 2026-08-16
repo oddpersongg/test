@@ -68,6 +68,18 @@ bl_ret_t Bl_Rte_Init(void);
  */
 bl_ret_t Bl_Rte_Deinit(void);
 
+/**
+ * @brief  system reset through the RTE
+ * @note   Delegates to the adapter layer (Bl_DriverAdapter_SystemReset) so
+ *         Core modules (e.g. Bl_Uds 0x11 ECUReset) never touch chip-specific
+ *         reset code directly. The reset type is forwarded verbatim.
+ * @param  u8_ResetType : reset type (0x01 hard / 0x02 key-off-on /
+ *                        0x03 soft / 0x04 fast-soft)
+ * @retval BL_E_OK     : reset issued (never returns on success)
+ * @retval BL_E_NOT_OK : reset type not supported by the adapter
+ */
+bl_ret_t Bl_Rte_SystemReset(bl_uint8_t u8_ResetType);
+
 #ifdef __cplusplus
 }
 #endif

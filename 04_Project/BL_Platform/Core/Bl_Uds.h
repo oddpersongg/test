@@ -114,12 +114,19 @@ void Bl_Uds_SendNrc(bl_uint8_t u8_Sid, bl_uint8_t u8_Nrc);
 
 void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);  /* 0x10 */
 
-/* 0x10 per-sub-service response functions (referenced by Bl_Uds_DiagSession_Lcfg.c) */
+/* 0x10 per-sub-service response functions (referenced by Bl_UdsService_Lcfg.c) */
 void Bl_Uds_DiagSessionDefaultResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
 void Bl_Uds_DiagSessionProgrammingResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
 void Bl_Uds_DiagSessionExtendedResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
 
 void Bl_Uds_ECUReset(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);            /* 0x11 */
+
+/* 0x11 per-sub-service response functions (referenced by Bl_UdsService_Lcfg.c) */
+void Bl_Uds_EcuResetHardResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);         /* 01 hardReset */
+void Bl_Uds_EcuResetKeyOffOnResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);     /* 02 keyOffOnReset */
+void Bl_Uds_EcuResetSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);         /* 03 softReset */
+void Bl_Uds_EcuResetFastSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);     /* 04 fastSoftReset */
+
 void Bl_Uds_SecurityAccess(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);      /* 0x27 */
 void Bl_Uds_RequestDownload(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);     /* 0x34 */
 void Bl_Uds_TransferData(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);        /* 0x36 */

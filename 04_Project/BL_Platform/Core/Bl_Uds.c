@@ -37,6 +37,18 @@
  *                       Bl_UdsService_Find), configured session side effects
  *                       applied, then jump to the per-sub-service response
  *                       function (Default/Programming/Extended)
+ *                       [Modify] Bl_Uds_ResetToDefaultSession restarts the
+ *                       S3 timer so the default session also gets a fresh
+ *                       timeout window (no repeated idle resets)
+ *                       [Modify] 0x11 ECUReset now actually resets with a
+ *                       synchronous respond-then-reset flow: the 0x51
+ *                       response is queued, then the send pipeline is pumped
+ *                       in-line (Bl_Can_MainFunctionWrite + CanTp_MainFunction,
+ *                       bounded by BL_UDS_ECURESET_TX_TIMEOUT_MS) until the
+ *                       response is confirmed on the bus, then
+ *                       Bl_Rte_SystemReset executes the reset — deterministic
+ *                       within the handler, independent of the next main-loop
+ *                       iteration
  */
 
 /****************************************************************
@@ -46,6 +58,9 @@
 #include "Bl_CanTp.h"
 #include "Bl_TimingManager.h"
 #include "Bl_UdsService.h"
+#include "Bl_Rte.h"         /* Bl_Rte_SystemReset (UDS 0x11 ECUReset) */
+#include "Bl_Can.h"         /* Bl_Can_MainFunctionWrite (sync pump)    */
+#include "Bl_TaskSchedule.h"/* Bl_TaskSchedule_GetTickMs (pump timeout) */
 
 /****************************************************************
  *                         Macros
@@ -109,6 +124,7 @@ static void s_Bl_Uds_SendResponse(bl_uint8_t u8_Len);
 static bl_uint32_t s_Bl_Uds_ReadBytes(const bl_uint8_t *p_Src, bl_uint8_t u8_N);
 static void s_Bl_Uds_TxQueuePush(bl_uint8_t u8_Len);
 static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub);
+static void s_Bl_Uds_SendEcuResetResp(bl_uint8_t u8_Sub);
 
 /****************************************************************
  *                 Global Variables
@@ -154,6 +170,9 @@ bl_uint8_t Bl_Uds_GetSession(void)
 
 /**
  * @brief  reset to the default diagnostic session (S3 timeout)
+ * @note   Restarts the S3 timer so the default session also has a timeout
+ *         window (otherwise IsExpired stays 1 and the reset would re-run on
+ *         every Dcm_MainFunction call until the next request restarts it).
  * @param  None
  * @retval None
  */
@@ -164,6 +183,9 @@ void Bl_Uds_ResetToDefaultSession(void)
     s_Bl_Uds_DlState       = BL_UDS_DL_STATE_IDLE;
     s_Bl_Uds_DlAccepted    = 0U;
     s_Bl_Uds_DlLastBlock   = 0U;
+
+    /* start a fresh S3 window for the default session */
+    (void)Bl_TimingManager_Start(BL_TIMINGMANAGER_TIMER_S3);
 }
 
 /**
@@ -304,13 +326,17 @@ static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub)
 }
 
 /**
- * @brief  ECU reset (0x11)
+ * @brief  ECU reset (0x11) — dispatcher
+ * @note   Matches the request sub-function against the centralized UDS
+ *         sub-service config table (Bl_UdsService), then jumps to the
+ *         per-sub-service response function.
  * @param  p_Req     : request SDU
  * @param  u32_ReqLen: request SDU length
  * @retval None
  */
 void Bl_Uds_ECUReset(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 {
+    const Bl_UdsService_SubCfg_t *p_Cfg;
     bl_uint8_t u8_Sub;
 
     if (u32_ReqLen < 2U)
@@ -320,18 +346,130 @@ void Bl_Uds_ECUReset(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
     }
 
     u8_Sub = p_Req[1];
-    if (u8_Sub != 0x01U)    /* Phase 1: hard reset only */
+
+    /* look up the sub-service in the centralized UDS sub-service table */
+    p_Cfg = Bl_UdsService_Find(BL_UDS_SID_ECU_RESET, (bl_uint8_t)(u8_Sub & 0x7FU));
+    if (p_Cfg == BL_NULL_PTR)
     {
         Bl_Uds_SendNrc(BL_UDS_SID_ECU_RESET, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
         return;
     }
 
+    /* jump to the per-sub-service response function */
+    if (p_Cfg->p_Func != BL_NULL_PTR)
+    {
+        p_Cfg->p_Func(p_Req, u32_ReqLen);
+    }
+}
+
+/**
+ * @brief  0x11 sub-service response: hard reset (0x51 01)
+ * @note   s_Bl_Uds_SendEcuResetResp queues the response, synchronously pumps
+ *         the send pipeline until the 0x51 frame is on the bus, then executes
+ *         the reset (ISO 14229: respond first).
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_EcuResetHardResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendEcuResetResp(0x01U);
+}
+
+/**
+ * @brief  0x11 sub-service response: key off/on reset (0x51 02)
+ * @note   Same respond-then-reset flow as hard reset; on this hardware the
+ *         adapter simulates the power cycle with a system reset.
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_EcuResetKeyOffOnResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendEcuResetResp(0x02U);
+}
+
+/**
+ * @brief  0x11 sub-service response: soft reset (0x51 03)
+ * @note   Same respond-then-reset flow as hard reset.
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_EcuResetSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendEcuResetResp(0x03U);
+}
+
+/**
+ * @brief  0x11 sub-service response: fast soft reset (0x51 04)
+ * @note   Same respond-then-reset flow as hard reset.
+ * @param  p_Req     : request SDU
+ * @param  u32_ReqLen: request SDU length
+ * @retval None
+ */
+void Bl_Uds_EcuResetFastSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+{
+    (void)p_Req;
+    (void)u32_ReqLen;
+
+    s_Bl_Uds_SendEcuResetResp(0x04U);
+}
+
+/**
+ * @brief  common 0x11 positive response (0x51 sub) + synchronously reset
+ * @note   ISO 14229: respond BEFORE resetting. The 0x51 response is queued
+ *         (through the normal response queue so back-to-back requests keep
+ *         their order), then the send pipeline is pumped in-line — the same
+ *         MainFunction flow the scheduler drives cyclically — until every
+ *         queued response is confirmed (i.e. the 0x51 frame is on the bus),
+ *         with a bounded timeout (BL_UDS_ECURESET_TX_TIMEOUT_MS). Only then
+ *         is the actual reset executed via Bl_Rte_SystemReset. The reset is
+ *         thus fully deterministic within this handler, independent of the
+ *         scheduler's next main-loop iteration.
+ * @param  u8_Sub : reset type echoed in the response
+ * @retval None
+ */
+static void s_Bl_Uds_SendEcuResetResp(bl_uint8_t u8_Sub)
+{
+    bl_uint32_t u32_StartTick;
+    bl_uint32_t u32_TimeoutMs;
+
     s_Bl_Uds_Resp[0] = (bl_uint8_t)(BL_UDS_SID_ECU_RESET + 0x40U);
     s_Bl_Uds_Resp[1] = u8_Sub;
+
+    /* queue + try to start the 0x51 response (queued if CanTp is busy) */
     s_Bl_Uds_SendResponse(2U);
 
-    /* TODO: trigger the actual reset (e.g. NVIC_SystemReset) after the
-       response is on the bus (delay + reset via the Apdapter layer) */
+    /* synchronous pump: drive the same MainFunction flow the main loop
+       uses until all queued responses are confirmed (TX queue empty and
+       nothing in flight => the 0x51 SDU has been fully transmitted) */
+    u32_TimeoutMs  = BL_UDS_ECURESET_TX_TIMEOUT_MS;
+    u32_StartTick  = Bl_TaskSchedule_GetTickMs();
+
+    while ((s_Bl_Uds_TxCount != 0U) || (s_Bl_Uds_TxInFlight != 0U))
+    {
+        Bl_Can_MainFunctionWrite();
+        Bl_CanTp_MainFunction();
+
+        /* wrap-safe timeout (32-bit tick) */
+        if ((Bl_TaskSchedule_GetTickMs() - u32_StartTick) >= u32_TimeoutMs)
+        {
+            break;      /* give up waiting; reset anyway */
+        }
+    }
+
+    /* the 0x51 response is on the bus (or the bus is broken): reset now */
+    (void)Bl_Rte_SystemReset(u8_Sub);
 }
 
 /**
@@ -579,8 +717,9 @@ void Bl_CanTp_UpperRxErrorIndication(Bl_CanIf_PduIdType u16_PduId)
 
 /**
  * @brief  CanTp upper-layer TX confirmation (overrides the weak default)
- * @note   A response finished transmitting (or failed). Try to flush the
- *         next queued response so back-to-back requests keep their order.
+ * @note   A response finished transmitting (or failed). Pop the in-flight
+ *         head and try to flush the next queued response so back-to-back
+ *         requests keep their order.
  * @param  u16_PduId : CanIf PDU id of the completed TX
  * @param  u8_Result : BL_E_OK / BL_E_NOT_OK
  * @retval None

@@ -87,6 +87,12 @@ extern "C" {
  *         requests queue their responses here and flush on TxConfirmation) */
 #define BL_UDS_RESPONSE_QUEUE_DEPTH             4U
 
+/** @brief max time (ms) the 0x11 ECUReset handler waits for its 0x51
+ *         response to be transmitted before resetting anyway (sync pump).
+ *         Aliases the CanTp N_As value — one single-frame TX confirmation
+ *         window is far more than enough for the 2-byte 0x51 SF. */
+#define BL_UDS_ECURESET_TX_TIMEOUT_MS           BL_TIMINGMANAGER_N_AS_TIMEOUT_MS
+
 /** @brief application flash area (0x34 address validation; adjust per layout) */
 #define BL_UDS_APP_FLASH_BASE_ADDR              0x08008000UL
 #define BL_UDS_APP_FLASH_MAX_SIZE               0x000F8000UL   /* 512KB - bootloader */
