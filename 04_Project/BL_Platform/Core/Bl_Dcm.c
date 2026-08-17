@@ -177,7 +177,7 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
         }
 
         /* suppress-positive-response bit used but not allowed for this service -> 0x12 */
-        if ((p_Info->e_SuppressBit == BL_DCM_SUPPRESS_BIT_DISALLOWED) &&
+        if ((p_Info->e_SuppressBit == BL_DCM_SUPPRESS_BIT_DISABLE) &&
             ((p_Sdu[1] & 0x80U) != 0U))
         {
             Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
@@ -185,7 +185,11 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
         }
     }
 
-    if ((p_Info->u8_SessionMask & (1U << (Bl_Uds_GetSession() - 1U))) == 0U)
+    /* session gate: the service's session mask (OR of
+       BL_DCM_SESSION_MASK_* bits) must contain the current session
+       (session N -> bit N-1) */
+    if (((bl_uint8_t)p_Info->e_SessionMask &
+         (bl_uint8_t)(1U << (Bl_Uds_GetSession() - 1U))) == 0U)
     {
         Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION);
         return;

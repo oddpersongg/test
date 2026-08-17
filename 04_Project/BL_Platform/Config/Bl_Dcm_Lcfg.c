@@ -48,24 +48,39 @@
 
 /**
  * @brief diagnostic service config table (SID lookup order is irrelevant)
- * @note  Edit this table to add / remove / re-configure services. Columns:
- *        SID | subFuncLen(0/1) | suppressBit | minDataLen | maxDataLen
- *        (data = request minus SID and sub-function; min==max => fixed
- *        length) | sessionMask(bit0 default | bit1 prog | bit2 ext) |
- *        securityNeeded | P2Override | P2StarOverride | handler.
- *        Supported sub-functions are NOT configured here — the Dcm 0x12
- *        gate asks the UdsService sub-service table (Bl_UdsService_Find).
+ * @note  Edit this table to add / remove / re-configure services. Each entry
+ *        is split over two lines: (SID, subFuncLen, suppressBit) then
+ *        (minDataLen, maxDataLen, sessionMask, securityNeeded, handler).
+ *        Supported sub-functions are NOT configured here — the Dcm 0x12 gate
+ *        asks the UdsService sub-service table (Bl_UdsService_Find).
  */
 const Bl_Dcm_Service_t g_Bl_Dcm_ServiceConfig[BL_DCM_SERVICE_CNT] =
 {
-    /* SID    subLen suppressBit                  minData maxData  sessionMask sec  P2ovr P2*ovr handler */
-    { BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL, 1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_DiagSessionControl },
-    { BL_UDS_SID_ECU_RESET,                  1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_ECUReset },
-    { BL_UDS_SID_SECURITY_ACCESS,            1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 8U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_SecurityAccess },
-    { BL_UDS_SID_REQUEST_DOWNLOAD,           0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 3U, 10U,  0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestDownload },
-    { BL_UDS_SID_TRANSFER_DATA,              0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 2U, 2049U, 0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_TransferData },
-    { BL_UDS_SID_REQUEST_TRANSFER_EXIT,      0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,   0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestTransferExit },
-    { BL_UDS_SID_TESTER_PRESENT,             1U, BL_DCM_SUPPRESS_BIT_ALLOWED,    0U, 0U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_TesterPresent },
+    /* SID                          subLen  suppressBit                    */
+    /*  minData maxData  sessionMask        sec  handler                   */
+    { BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL, 1U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      0U, 0U, BL_DCM_SESSION_MASK_ALL, 0U, Bl_Uds_DiagSessionControl },
+
+    { BL_UDS_SID_ECU_RESET,                  1U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      0U, 0U, BL_DCM_SESSION_MASK_ALL, 0U, Bl_Uds_ECUReset },
+
+    { BL_UDS_SID_SECURITY_ACCESS,            1U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      0U, 8U, BL_DCM_SESSION_MASK_ALL, 0U, Bl_Uds_SecurityAccess },
+
+    { BL_UDS_SID_REQUEST_DOWNLOAD,           0U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      3U, 10U, BL_DCM_SESSION_MASK_PROGRAMMING, 1U, Bl_Uds_RequestDownload },
+
+    /* 0x36 data segment = block sequence counter (1) + payload (1..2048):
+       max = TRANSFER_BLOCK_SIZE + 1, linked to the configured block size
+       (buffer = block + 2 overhead, Dcm buffer holds the whole request) */
+    { BL_UDS_SID_TRANSFER_DATA,              0U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      2U, (bl_uint16_t)(BL_UDS_TRANSFER_BLOCK_SIZE + 1U), BL_DCM_SESSION_MASK_PROGRAMMING, 1U, Bl_Uds_TransferData },
+
+    { BL_UDS_SID_REQUEST_TRANSFER_EXIT,      0U, BL_DCM_SUPPRESS_BIT_DISABLE,
+      0U, 0U, BL_DCM_SESSION_MASK_PROGRAMMING, 1U, Bl_Uds_RequestTransferExit },
+
+    { BL_UDS_SID_TESTER_PRESENT,             1U, BL_DCM_SUPPRESS_BIT_ENABLE,
+      0U, 0U, BL_DCM_SESSION_MASK_ALL, 0U, Bl_Uds_TesterPresent },
 };
 
 /****************************************************************
