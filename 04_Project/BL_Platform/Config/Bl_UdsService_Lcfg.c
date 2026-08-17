@@ -54,15 +54,15 @@
 /**
  * @brief 0x10 DiagnosticSessionControl sub-service table
  * @note  Edit to add / remove / re-configure session sub-functions.
- *        Columns: subFunc | name | resetSecurity | resetDownload | respDataLen
- *        | response function.
+ *        Columns: subFunc | name | resetSecurity | resetDownload |
+ *        response function.
  */
 const Bl_UdsService_SubCfg_t g_Bl_UdsService_DiagSessionSubConfig[BL_UDSSERVICE_DIAGSESSION_SUB_CNT] =
 {
-    /* sub  name                   resetSec resetDl respDataLen func                            */
-    { 0x01U, BL_UDS_SESSION_DEFAULT,    1U,   1U,    4U, Bl_Uds_DiagSessionDefaultResp },
-    { 0x02U, BL_UDS_SESSION_PROGRAMMING, 1U,   1U,    4U, Bl_Uds_DiagSessionProgrammingResp },
-    { 0x03U, BL_UDS_SESSION_EXTENDED,    1U,   1U,    4U, Bl_Uds_DiagSessionExtendedResp },
+    /* sub  name                   resetSec resetDl func                            */
+    { 0x01U, BL_UDS_SESSION_DEFAULT,    1U,   1U,    Bl_Uds_DiagSessionDefaultResp },
+    { 0x02U, BL_UDS_SESSION_PROGRAMMING, 1U,   1U,    Bl_Uds_DiagSessionProgrammingResp },
+    { 0x03U, BL_UDS_SESSION_EXTENDED,    1U,   1U,    Bl_Uds_DiagSessionExtendedResp },
 };
 
 /**
@@ -71,11 +71,11 @@ const Bl_UdsService_SubCfg_t g_Bl_UdsService_DiagSessionSubConfig[BL_UDSSERVICE_
  */
 const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECURESET_SUB_CNT] =
 {
-    /* sub  name  resetSec resetDl respDataLen func                            */
-    { 0x01U, 0x01U,  0U,   0U,    0U, Bl_Uds_EcuResetHardResp },
-    { 0x02U, 0x02U,  0U,   0U,    0U, Bl_Uds_EcuResetKeyOffOnResp },
-    { 0x03U, 0x03U,  0U,   0U,    0U, Bl_Uds_EcuResetSoftResp },
-    { 0x04U, 0x04U,  0U,   0U,    0U, Bl_Uds_EcuResetFastSoftResp },
+    /* sub  name  resetSec resetDl func                            */
+    { 0x01U, 0x01U,  0U,   0U,    Bl_Uds_EcuResetHardResp },
+    { 0x02U, 0x02U,  0U,   0U,    Bl_Uds_EcuResetKeyOffOnResp },
+    { 0x03U, 0x03U,  0U,   0U,    Bl_Uds_EcuResetSoftResp },
+    { 0x04U, 0x04U,  0U,   0U,    Bl_Uds_EcuResetFastSoftResp },
 };
 
 /**
@@ -86,9 +86,9 @@ const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECU
  */
 const Bl_UdsService_SubCfg_t g_Bl_UdsService_SecurityAccessSubConfig[BL_UDSSERVICE_SECURITYACCESS_SUB_CNT] =
 {
-    /* sub  name  resetSec resetDl respDataLen func  */
-    { 0x01U, 0x01U,  0U,   0U,    1U, BL_NULL_PTR },  /* request seed */
-    { 0x02U, 0x02U,  0U,   0U,    0U, BL_NULL_PTR },  /* send key     */
+    /* sub  name  resetSec resetDl func  */
+    { 0x01U, 0x01U,  0U,   0U,    BL_NULL_PTR },  /* request seed */
+    { 0x02U, 0x02U,  0U,   0U,    BL_NULL_PTR },  /* send key     */
 };
 
 /**
@@ -98,8 +98,8 @@ const Bl_UdsService_SubCfg_t g_Bl_UdsService_SecurityAccessSubConfig[BL_UDSSERVI
  */
 const Bl_UdsService_SubCfg_t g_Bl_UdsService_TesterPresentSubConfig[BL_UDSSERVICE_TESTERPRESENT_SUB_CNT] =
 {
-    /* sub  name  resetSec resetDl respDataLen func  */
-    { 0x00U, 0x00U,  0U,   0U,    0U, BL_NULL_PTR },
+    /* sub  name  resetSec resetDl func  */
+    { 0x00U, 0x00U,  0U,   0U,    BL_NULL_PTR },
 };
 
 /**

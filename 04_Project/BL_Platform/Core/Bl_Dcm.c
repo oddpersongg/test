@@ -42,6 +42,10 @@
  *                       sub-service id table in Bl_UdsService_Lcfg
  *                       (p_SubTable/u8_SubCnt) instead of a bitmap — single
  *                       source of sub-function ids shared with the Uds layer
+ *                       [Modify] sub-function gate simplified: calls
+ *                       Bl_UdsService_Find(sid, sub) directly — the Dcm
+ *                       config table no longer carries any sub-function
+ *                       reference (discrimination metadata only)
  */
 
 /****************************************************************
@@ -51,6 +55,7 @@
 #include "Bl_Dcm_Lcfg.h"
 #include "Bl_CanTp.h"
 #include "Bl_Uds.h"
+#include "Bl_UdsService.h"      /* sub-function gate (Bl_UdsService_Find) */
 #include "Bl_TimingManager.h"
 
 /****************************************************************
@@ -157,32 +162,15 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
     /* sub-function gating (only for services that carry a sub-function byte)
        ISO 14229 sub-function is always 1 byte; the request may carry extra
        data after it (e.g. 0x27 key, 0x34 address), so only the presence of
-       the field is checked here — value validity is enforced by looking the
-       sub-function up in the service's sub-service id table
-       (Bl_UdsService_Lcfg, single source). Not found -> 0x12. */
+       the field is checked here — value validity is decided by the
+       UdsService sub-service table: Bl_UdsService_Find(sid, sub) returns
+       NULL when the sub-function is not configured -> 0x12. The sub-function
+       id is defined in exactly one place (Bl_UdsService_Lcfg). */
     if (p_Info->u8_SubFuncLen > 0U)
     {
-        bl_uint8_t i;
-        bl_uint8_t b_SubFound = 0U;
-
         u8_Sub = p_Sdu[1] & 0x7FU;      /* strip the suppress-positive-response bit */
 
-        if ((p_Info->p_SubTable == BL_NULL_PTR) || (p_Info->u8_SubCnt == 0U))
-        {
-            /* config error: sub-function declared but no table */
-            Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
-            return;
-        }
-
-        for (i = 0U; i < p_Info->u8_SubCnt; i++)
-        {
-            if (p_Info->p_SubTable[i].u8_SubFunc == u8_Sub)
-            {
-                b_SubFound = 1U;
-                break;
-            }
-        }
-        if (b_SubFound == 0U)
+        if (Bl_UdsService_Find(u8_Sid, u8_Sub) == BL_NULL_PTR)
         {
             Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
             return;

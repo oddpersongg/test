@@ -84,7 +84,6 @@ typedef struct {
     bl_uint8_t              u8_SubFuncName;    /**< semantic name/level of the sub-func */
     bl_uint8_t              u8_ResetSecurity;  /**< 1 = clear security on this sub      */
     bl_uint8_t              u8_ResetDownload;  /**< 1 = clear download on this sub      */
-    bl_uint8_t              u8_RespDataLen;    /**< positive-resp data len (excl. SID+sub) */
     Bl_UdsService_SubFunc_t p_Func;            /**< per-sub-service response function    */
 } Bl_UdsService_SubCfg_t;
 
