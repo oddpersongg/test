@@ -49,6 +49,13 @@
  *                       Bl_Rte_SystemReset executes the reset — deterministic
  *                       within the handler, independent of the next main-loop
  *                       iteration
+ *                       [Modify] per-sub-service response shells removed:
+ *                       0x10 (Default/Programming/Extended) and 0x11
+ *                       (hard/keyOffOn/soft/fastSoft) were empty wrappers
+ *                       over static helpers; each service now has one shared
+ *                       response function (Bl_Uds_DiagSessionResp /
+ *                       Bl_Uds_EcuResetResp) that reads the sub-function
+ *                       from the request itself
  */
 
 /****************************************************************
@@ -123,8 +130,6 @@ static bl_uint8_t s_Bl_Uds_DlLastBlock = 0U;
 static void s_Bl_Uds_SendResponse(bl_uint8_t u8_Len);
 static bl_uint32_t s_Bl_Uds_ReadBytes(const bl_uint8_t *p_Src, bl_uint8_t u8_N);
 static void s_Bl_Uds_TxQueuePush(bl_uint8_t u8_Len);
-static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub);
-static void s_Bl_Uds_SendEcuResetResp(bl_uint8_t u8_Sub);
 
 /****************************************************************
  *                 Global Variables
@@ -266,54 +271,23 @@ void Bl_Uds_DiagSessionControl(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 }
 
 /**
- * @brief  0x10 sub-service response: default session (0x50 01 + P2/P2*)
+ * @brief  0x10 sub-service response (0x50 sub + P2 + P2*)
+ * @note   Shared by every 0x10 sub-service: the sub-function is read from
+ *         the request itself (p_Req[1]) — the former per-sub-service shell
+ *         functions (Default/Programming/Extended) were redundant wrappers
+ *         over a static helper and are gone.
  * @param  p_Req     : request SDU
  * @param  u32_ReqLen: request SDU length
  * @retval None
  */
-void Bl_Uds_DiagSessionDefaultResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+void Bl_Uds_DiagSessionResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 {
-    (void)p_Req;
+    bl_uint8_t u8_Sub;
+
     (void)u32_ReqLen;
 
-    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_DEFAULT);
-}
+    u8_Sub = (bl_uint8_t)(p_Req[1] & 0x7FU);
 
-/**
- * @brief  0x10 sub-service response: programming session (0x50 02 + P2/P2*)
- * @param  p_Req     : request SDU
- * @param  u32_ReqLen: request SDU length
- * @retval None
- */
-void Bl_Uds_DiagSessionProgrammingResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
-{
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_PROGRAMMING);
-}
-
-/**
- * @brief  0x10 sub-service response: extended session (0x50 03 + P2/P2*)
- * @param  p_Req     : request SDU
- * @param  u32_ReqLen: request SDU length
- * @retval None
- */
-void Bl_Uds_DiagSessionExtendedResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
-{
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendDiagSessionResp(BL_UDS_SESSION_EXTENDED);
-}
-
-/**
- * @brief  common 0x10 positive response (0x50 sub + P2 + P2*)
- * @param  u8_Sub : session sub-function echoed in the response
- * @retval None
- */
-static void s_Bl_Uds_SendDiagSessionResp(bl_uint8_t u8_Sub)
-{
     s_Bl_Uds_Resp[0] = (bl_uint8_t)(BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL + 0x40U);
     s_Bl_Uds_Resp[1] = u8_Sub;
     /* P2 / P2* advertised at runtime from the centralized timing config */
@@ -363,86 +337,33 @@ void Bl_Uds_ECUReset(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 }
 
 /**
- * @brief  0x11 sub-service response: hard reset (0x51 01)
- * @note   s_Bl_Uds_SendEcuResetResp queues the response, synchronously pumps
- *         the send pipeline until the 0x51 frame is on the bus, then executes
- *         the reset (ISO 14229: respond first).
+ * @brief  0x11 sub-service response (0x51 sub) + synchronously reset
+ * @note   Shared by every 0x11 sub-service: the reset type is read from the
+ *         request itself (p_Req[1]) — the former per-sub-service shell
+ *         functions (hard/keyOffOn/soft/fastSoft) were redundant wrappers
+ *         over a static helper and are gone. ISO 14229: respond BEFORE
+ *         resetting. The 0x51 response is queued (through the normal
+ *         response queue so back-to-back requests keep their order), then
+ *         the send pipeline is pumped in-line — the same MainFunction flow
+ *         the scheduler drives cyclically — until every queued response is
+ *         confirmed (i.e. the 0x51 frame is on the bus), with a bounded
+ *         timeout (BL_UDS_ECURESET_TX_TIMEOUT_MS). Only then is the actual
+ *         reset executed via Bl_Rte_SystemReset. The reset is thus fully
+ *         deterministic within this handler, independent of the scheduler's
+ *         next main-loop iteration.
  * @param  p_Req     : request SDU
  * @param  u32_ReqLen: request SDU length
  * @retval None
  */
-void Bl_Uds_EcuResetHardResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
+void Bl_Uds_EcuResetResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
 {
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendEcuResetResp(0x01U);
-}
-
-/**
- * @brief  0x11 sub-service response: key off/on reset (0x51 02)
- * @note   Same respond-then-reset flow as hard reset; on this hardware the
- *         adapter simulates the power cycle with a system reset.
- * @param  p_Req     : request SDU
- * @param  u32_ReqLen: request SDU length
- * @retval None
- */
-void Bl_Uds_EcuResetKeyOffOnResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
-{
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendEcuResetResp(0x02U);
-}
-
-/**
- * @brief  0x11 sub-service response: soft reset (0x51 03)
- * @note   Same respond-then-reset flow as hard reset.
- * @param  p_Req     : request SDU
- * @param  u32_ReqLen: request SDU length
- * @retval None
- */
-void Bl_Uds_EcuResetSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
-{
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendEcuResetResp(0x03U);
-}
-
-/**
- * @brief  0x11 sub-service response: fast soft reset (0x51 04)
- * @note   Same respond-then-reset flow as hard reset.
- * @param  p_Req     : request SDU
- * @param  u32_ReqLen: request SDU length
- * @retval None
- */
-void Bl_Uds_EcuResetFastSoftResp(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen)
-{
-    (void)p_Req;
-    (void)u32_ReqLen;
-
-    s_Bl_Uds_SendEcuResetResp(0x04U);
-}
-
-/**
- * @brief  common 0x11 positive response (0x51 sub) + synchronously reset
- * @note   ISO 14229: respond BEFORE resetting. The 0x51 response is queued
- *         (through the normal response queue so back-to-back requests keep
- *         their order), then the send pipeline is pumped in-line — the same
- *         MainFunction flow the scheduler drives cyclically — until every
- *         queued response is confirmed (i.e. the 0x51 frame is on the bus),
- *         with a bounded timeout (BL_UDS_ECURESET_TX_TIMEOUT_MS). Only then
- *         is the actual reset executed via Bl_Rte_SystemReset. The reset is
- *         thus fully deterministic within this handler, independent of the
- *         scheduler's next main-loop iteration.
- * @param  u8_Sub : reset type echoed in the response
- * @retval None
- */
-static void s_Bl_Uds_SendEcuResetResp(bl_uint8_t u8_Sub)
-{
+    bl_uint8_t u8_Sub;
     bl_uint32_t u32_StartTick;
     bl_uint32_t u32_TimeoutMs;
+
+    (void)u32_ReqLen;
+
+    u8_Sub = (bl_uint8_t)(p_Req[1] & 0x7FU);
 
     s_Bl_Uds_Resp[0] = (bl_uint8_t)(BL_UDS_SID_ECU_RESET + 0x40U);
     s_Bl_Uds_Resp[1] = u8_Sub;
