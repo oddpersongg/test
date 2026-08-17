@@ -177,7 +177,8 @@ void Bl_CanTp_UpperRxIndication(Bl_CanIf_PduIdType u16_PduId,
         }
 
         /* suppress-positive-response bit used but not allowed for this service -> 0x12 */
-        if ((p_Info->u8_SuppressBit == 0U) && ((p_Sdu[1] & 0x80U) != 0U))
+        if ((p_Info->e_SuppressBit == BL_DCM_SUPPRESS_BIT_DISALLOWED) &&
+            ((p_Sdu[1] & 0x80U) != 0U))
         {
             Bl_Uds_SendNrc(u8_Sid, BL_UDS_NRC_SUBFUNCTION_NOT_SUPPORTED);
             return;

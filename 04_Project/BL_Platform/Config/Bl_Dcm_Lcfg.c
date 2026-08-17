@@ -58,14 +58,14 @@
  */
 const Bl_Dcm_Service_t g_Bl_Dcm_ServiceConfig[BL_DCM_SERVICE_CNT] =
 {
-    /* SID    subLen supp  minData maxData  sessionMask sec  P2ovr P2*ovr handler */
-    { BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL, 1U, 0U, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_DiagSessionControl },
-    { BL_UDS_SID_ECU_RESET,                  1U, 0U, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_ECUReset },
-    { BL_UDS_SID_SECURITY_ACCESS,            1U, 0U, 0U, 8U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_SecurityAccess },
-    { BL_UDS_SID_REQUEST_DOWNLOAD,           0U, 0U, 3U, 10U,  0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestDownload },
-    { BL_UDS_SID_TRANSFER_DATA,              0U, 0U, 2U, 2049U, 0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_TransferData },
-    { BL_UDS_SID_REQUEST_TRANSFER_EXIT,      0U, 0U, 0U, 0U,   0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestTransferExit },
-    { BL_UDS_SID_TESTER_PRESENT,             1U, 1U, 0U, 0U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_TesterPresent },
+    /* SID    subLen suppressBit                  minData maxData  sessionMask sec  P2ovr P2*ovr handler */
+    { BL_UDS_SID_DIAGNOSTIC_SESSION_CONTROL, 1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_DiagSessionControl },
+    { BL_UDS_SID_ECU_RESET,                  1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,    0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_ECUReset },
+    { BL_UDS_SID_SECURITY_ACCESS,            1U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 8U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_SecurityAccess },
+    { BL_UDS_SID_REQUEST_DOWNLOAD,           0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 3U, 10U,  0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestDownload },
+    { BL_UDS_SID_TRANSFER_DATA,              0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 2U, 2049U, 0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_TransferData },
+    { BL_UDS_SID_REQUEST_TRANSFER_EXIT,      0U, BL_DCM_SUPPRESS_BIT_DISALLOWED, 0U, 0U,   0x02U, 1U, 0xFFU, 0xFFU, Bl_Uds_RequestTransferExit },
+    { BL_UDS_SID_TESTER_PRESENT,             1U, BL_DCM_SUPPRESS_BIT_ALLOWED,    0U, 0U,   0x07U, 0U, 0xFFU, 0xFFU, Bl_Uds_TesterPresent },
 };
 
 /****************************************************************

@@ -25,6 +25,8 @@
  *                       Dcm table trimmed to discrimination metadata only
  *                       (removed p_SubTable/u8_SubCnt/u8_RespDataLen — the
  *                       latter was never consumed anywhere)
+ *                       [Modify] u8_SuppressBit replaced by the
+ *                       Bl_Dcm_SuppressBitType enum (ALLOWED / DISALLOWED)
  */
 
 /****************************************************************
@@ -64,6 +66,16 @@ extern "C" {
 typedef void (*Bl_Uds_ServiceFunc_t)(const bl_uint8_t *p_Req, bl_uint32_t u32_ReqLen);
 
 /**
+ * @brief whether a service allows the suppress-positive-response bit
+ *        (sub-function byte bit7 = 0x80, ISO 14229 suppressPosRspMsgIndicationBit)
+ */
+typedef enum
+{
+    BL_DCM_SUPPRESS_BIT_DISALLOWED = 0U,  /**< bit7 set on the sub-function -> NRC 0x12  */
+    BL_DCM_SUPPRESS_BIT_ALLOWED    = 1U   /**< e.g. 3E 80: execute, but send no response */
+} Bl_Dcm_SuppressBitType;
+
+/**
  * @brief diagnostic service table entry
  * @note  Dispatch-level discrimination metadata only — the table decides
  *        whether a request may enter the service handler (p_Func). Supported
@@ -73,10 +85,9 @@ typedef void (*Bl_Uds_ServiceFunc_t)(const bl_uint8_t *p_Req, bl_uint32_t u32_Re
  */
 typedef struct {
     bl_uint8_t           u8_Sid;             /**< service ID (main service byte, e.g. 0x10)           */
-    bl_uint8_t           u8_SubFuncLen;      /**< sub-function byte count. ISO 14229 sub-function is
-                                                  ALWAYS 1 byte, so this is 0 (no sub-function) or 1 */
-    bl_uint8_t           u8_SuppressBit;     /**< 1 = sub-function 0x80 (suppress positive response)
-                                                  is allowed for this service                        */
+    bl_uint8_t                 u8_SubFuncLen;  /**< sub-function byte count. ISO 14229 sub-function is
+                                                    ALWAYS 1 byte, so this is 0 (no sub-function) or 1 */
+    Bl_Dcm_SuppressBitType     e_SuppressBit;  /**< suppress-positive-response bit (0x80) allowed?   */
     bl_uint8_t           u8_MinDataLen;      /**< data-segment length MINIMUM (data = request length
                                                   minus SID and sub-function). 0 for services with
                                                   no data bytes.                                     */
