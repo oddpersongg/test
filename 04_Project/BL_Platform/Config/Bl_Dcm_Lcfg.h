@@ -19,6 +19,11 @@
  *                       here from Bl_Dcm.c so services can be added / removed /
  *                       re-configured in the Config layer without touching the
  *                       Core dispatcher logic
+ *                       [Modify] sub-function support is no longer a bitmap:
+ *                       each service now references its sub-service id table
+ *                       in Bl_UdsService_Lcfg (p_SubTable + u8_SubCnt) — one
+ *                       definition of the supported sub-functions for both
+ *                       the Dcm gate and the Uds dispatch
  */
 
 /****************************************************************
@@ -37,6 +42,7 @@ extern "C" {
 #include "Bl_Types.h"
 #include "Bl_Dcm_Cfg.h"
 #include "Bl_Uds_Cfg.h"
+#include "Bl_UdsService_Lcfg.h"    /* Bl_UdsService_SubCfg_t (sub-service id tables) */
 
 /****************************************************************
  *                         Macros
@@ -66,8 +72,11 @@ typedef struct {
     bl_uint8_t           u8_Sid;             /**< service ID (main service byte, e.g. 0x10)           */
     bl_uint8_t           u8_SubFuncLen;      /**< sub-function byte count. ISO 14229 sub-function is
                                                   ALWAYS 1 byte, so this is 0 (no sub-function) or 1 */
-    bl_uint8_t           u8_SubFuncSupported;/**< sub-function bitmap (bit N = sub-function 0xN,
-                                                  up to 0x07); 0xFF = any sub-function accepted      */
+    const Bl_UdsService_SubCfg_t *p_SubTable;/**< the service's sub-service id table (single source:
+                                                  Bl_UdsService_Lcfg). Used for the 0x12 sub-function
+                                                  gate — entries are matched on u8_SubFunc. NULL when
+                                                  the service has no sub-function (u8_SubFuncLen==0) */
+    bl_uint8_t           u8_SubCnt;          /**< entries in p_SubTable (0 when no sub-function)    */
     bl_uint8_t           u8_SuppressBit;     /**< 1 = sub-function 0x80 (suppress positive response)
                                                   is allowed for this service                        */
     bl_uint8_t           u8_MinDataLen;      /**< data-segment length MINIMUM (data = request length

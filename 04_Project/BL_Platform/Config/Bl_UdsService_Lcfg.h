@@ -24,6 +24,11 @@
  *                       [Modify] split the single big table into per-service
  *                       tables + service index for config isolation and
  *                       readability
+ *                       [Modify] added 0x27 security-access and 0x3E
+ *                       tester-present sub-service tables so every
+ *                       sub-function-carrying service has one; the Dcm
+ *                       dispatcher now references these tables (single
+ *                       source of sub-function ids) instead of a bitmap
  */
 
 /****************************************************************
@@ -47,11 +52,13 @@ extern "C" {
  ***************************************************************/
 
 /** @brief number of services that have sub-service tables (index entries) */
-#define BL_UDSSERVICE_SVC_CNT   2U
+#define BL_UDSSERVICE_SVC_CNT   4U
 
 /** @brief sub-service entry counts per service */
 #define BL_UDSSERVICE_DIAGSESSION_SUB_CNT   3U   /**< 0x10 sessions       */
 #define BL_UDSSERVICE_ECURESET_SUB_CNT      4U   /**< 0x11 reset types    */
+#define BL_UDSSERVICE_SECURITYACCESS_SUB_CNT 2U  /**< 0x27 seed/key       */
+#define BL_UDSSERVICE_TESTERPRESENT_SUB_CNT 1U   /**< 0x3E sub 0x00       */
 
 /****************************************************************
  *                       Type Defs
@@ -99,6 +106,12 @@ extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_DiagSessionSubConfig[BL_UDSS
 
 /** @brief 0x11 reset sub-service table (defined in Bl_UdsService_Lcfg.c) */
 extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECURESET_SUB_CNT];
+
+/** @brief 0x27 security-access sub-service table (defined in Bl_UdsService_Lcfg.c) */
+extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_SecurityAccessSubConfig[BL_UDSSERVICE_SECURITYACCESS_SUB_CNT];
+
+/** @brief 0x3E tester-present sub-service table (defined in Bl_UdsService_Lcfg.c) */
+extern const Bl_UdsService_SubCfg_t g_Bl_UdsService_TesterPresentSubConfig[BL_UDSSERVICE_TESTERPRESENT_SUB_CNT];
 
 /** @brief service index table (defined in Bl_UdsService_Lcfg.c) */
 extern const Bl_UdsService_SvcIndex_t g_Bl_UdsService_SvcIndex[BL_UDSSERVICE_SVC_CNT];

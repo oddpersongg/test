@@ -19,6 +19,10 @@
  *                       0x10 sessions (default/programming/extended) and
  *                       0x11 reset types (hard/keyOffOn/soft/fastSoft), plus
  *                       the service index table
+ *                       [Modify] added 0x27 security-access (seed/key) and
+ *                       0x3E tester-present tables; index now covers all four
+ *                       sub-function-carrying services (Dcm references these
+ *                       tables as the single source of sub-function ids)
  */
 
 /****************************************************************
@@ -75,14 +79,40 @@ const Bl_UdsService_SubCfg_t g_Bl_UdsService_EcuResetSubConfig[BL_UDSSERVICE_ECU
 };
 
 /**
+ * @brief 0x27 SecurityAccess sub-service table
+ * @note  Sub-function gate only (single source of sub ids for the Dcm
+ *        dispatcher): the 0x27 handler in Bl_Uds still implements the
+ *        seed/key logic, so p_Func stays NULL here.
+ */
+const Bl_UdsService_SubCfg_t g_Bl_UdsService_SecurityAccessSubConfig[BL_UDSSERVICE_SECURITYACCESS_SUB_CNT] =
+{
+    /* sub  name  resetSec resetDl respDataLen func  */
+    { 0x01U, 0x01U,  0U,   0U,    1U, BL_NULL_PTR },  /* request seed */
+    { 0x02U, 0x02U,  0U,   0U,    0U, BL_NULL_PTR },  /* send key     */
+};
+
+/**
+ * @brief 0x3E TesterPresent sub-service table
+ * @note  Sub-function gate only; the 0x3E handler in Bl_Uds handles the
+ *        suppress-positive-response bit, p_Func stays NULL here.
+ */
+const Bl_UdsService_SubCfg_t g_Bl_UdsService_TesterPresentSubConfig[BL_UDSSERVICE_TESTERPRESENT_SUB_CNT] =
+{
+    /* sub  name  resetSec resetDl respDataLen func  */
+    { 0x00U, 0x00U,  0U,   0U,    0U, BL_NULL_PTR },
+};
+
+/**
  * @brief service index table: SID -> its sub-service table
  * @note  Edit to register a new service's sub-service table.
  */
 const Bl_UdsService_SvcIndex_t g_Bl_UdsService_SvcIndex[BL_UDSSERVICE_SVC_CNT] =
 {
-    /* sid  sub-table                        cnt  */
-    { 0x10U, g_Bl_UdsService_DiagSessionSubConfig, BL_UDSSERVICE_DIAGSESSION_SUB_CNT },
-    { 0x11U, g_Bl_UdsService_EcuResetSubConfig,    BL_UDSSERVICE_ECURESET_SUB_CNT },
+    /* sid  sub-table                              cnt  */
+    { 0x10U, g_Bl_UdsService_DiagSessionSubConfig,     BL_UDSSERVICE_DIAGSESSION_SUB_CNT },
+    { 0x11U, g_Bl_UdsService_EcuResetSubConfig,        BL_UDSSERVICE_ECURESET_SUB_CNT },
+    { 0x27U, g_Bl_UdsService_SecurityAccessSubConfig,  BL_UDSSERVICE_SECURITYACCESS_SUB_CNT },
+    { 0x3EU, g_Bl_UdsService_TesterPresentSubConfig,   BL_UDSSERVICE_TESTERPRESENT_SUB_CNT },
 };
 
 /****************************************************************
